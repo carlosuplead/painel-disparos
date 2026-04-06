@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import TemplateCard from '@/components/TemplateCard'
 import DisparoPanel from '@/components/DisparoPanel'
+import Resultados from '@/components/Resultados'
 
 export interface Template {
   id: string
@@ -15,14 +16,17 @@ export interface Template {
   components: { type: string; text?: string }[]
 }
 
+type Tab = 'disparar' | 'resultados'
+
 export default function Dashboard({ userEmail }: { userEmail: string }) {
-  const router  = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
 
-  const [templates, setTemplates]         = useState<Template[]>([])
+  const [tab, setTab]                          = useState<Tab>('disparar')
+  const [templates, setTemplates]              = useState<Template[]>([])
   const [loadingTemplates, setLoadingTemplates] = useState(true)
-  const [templateError, setTemplateError] = useState('')
-  const [selected, setSelected]           = useState<Template | null>(null)
+  const [templateError, setTemplateError]      = useState('')
+  const [selected, setSelected]                = useState<Template | null>(null)
 
   const loadTemplates = useCallback(async () => {
     setLoadingTemplates(true)
@@ -64,52 +68,80 @@ export default function Dashboard({ userEmail }: { userEmail: string }) {
         </div>
       </header>
 
+      {/* TAB NAV */}
+      <div className="border-b border-[#1e1e1e] bg-[#111] sticky top-14 z-10">
+        <div className="max-w-5xl mx-auto px-4 flex gap-0">
+          {([
+            { id: 'disparar',   label: '📤  Disparar' },
+            { id: 'resultados', label: '📊  Resultados' },
+          ] as { id: Tab; label: string }[]).map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-5 py-3.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                tab === t.id
+                  ? 'border-[#25D366] text-[#25D366]'
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <main className="max-w-5xl mx-auto px-4 py-8 pb-16">
 
-        {/* TEMPLATES */}
-        <div className="flex items-center gap-3 mb-5">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-            Templates disponíveis
-          </h2>
-          <button
-            onClick={loadTemplates}
-            className="text-xs text-gray-600 border border-[#252525] hover:border-[#3a3a3a] hover:text-gray-400 rounded-md px-2.5 py-1 transition-colors cursor-pointer"
-          >
-            ↻ Atualizar
-          </button>
-        </div>
+        {/* ── TAB: DISPARAR ── */}
+        {tab === 'disparar' && (
+          <>
+            <div className="flex items-center gap-3 mb-5">
+              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                Templates disponíveis
+              </h2>
+              <button
+                onClick={loadTemplates}
+                className="text-xs text-gray-600 border border-[#252525] hover:border-[#3a3a3a] hover:text-gray-400 rounded-md px-2.5 py-1 transition-colors cursor-pointer"
+              >
+                ↻ Atualizar
+              </button>
+            </div>
 
-        {loadingTemplates && (
-          <div className="flex items-center gap-2 text-gray-600 text-sm mb-8">
-            <Spinner /> Carregando templates...
-          </div>
+            {loadingTemplates && (
+              <div className="flex items-center gap-2 text-gray-600 text-sm mb-8">
+                <Spinner /> Carregando templates...
+              </div>
+            )}
+
+            {templateError && (
+              <div className="text-red-400 text-sm bg-[#1f0d0d] border border-[#4d1a1a] rounded-xl p-4 mb-8">
+                {templateError}
+              </div>
+            )}
+
+            {!loadingTemplates && !templateError && templates.length === 0 && (
+              <p className="text-gray-600 text-sm mb-8">Nenhum template aprovado encontrado.</p>
+            )}
+
+            {templates.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-10">
+                {templates.map(t => (
+                  <TemplateCard
+                    key={t.id}
+                    template={t}
+                    selected={selected?.id === t.id}
+                    onSelect={setSelected}
+                  />
+                ))}
+              </div>
+            )}
+
+            <DisparoPanel selected={selected} />
+          </>
         )}
 
-        {templateError && (
-          <div className="text-red-400 text-sm bg-[#1f0d0d] border border-[#4d1a1a] rounded-xl p-4 mb-8">
-            {templateError}
-          </div>
-        )}
-
-        {!loadingTemplates && !templateError && templates.length === 0 && (
-          <p className="text-gray-600 text-sm mb-8">Nenhum template aprovado encontrado.</p>
-        )}
-
-        {templates.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-10">
-            {templates.map(t => (
-              <TemplateCard
-                key={t.id}
-                template={t}
-                selected={selected?.id === t.id}
-                onSelect={setSelected}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* DISPARO */}
-        <DisparoPanel selected={selected} />
+        {/* ── TAB: RESULTADOS ── */}
+        {tab === 'resultados' && <Resultados />}
 
       </main>
     </div>
