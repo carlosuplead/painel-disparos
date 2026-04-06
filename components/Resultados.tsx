@@ -1,28 +1,51 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 interface ResultadosData {
-  periodo:        { start: string; end: string }
-  disparados:     number
-  responderam:    number
-  pausados:       number
-  agendados:      number
-  totalAgendados: number
-  taxaResposta:   string
+  periodo:         { start: string; end: string }
+  disparados:      number
+  responderam:     number
+  pausados:        number
+  agendados:       number
+  totalAgendados:  number
+  taxaResposta:    string
   taxaAgendamento: string
 }
 
 type Preset = 'hoje' | '7d' | '30d' | 'custom'
 
-function todayBRL(): string {
+function todayBRL() {
   return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
 }
-
-function daysAgoBRL(n: number): string {
+function daysAgoBRL(n: number) {
   const d = new Date()
   d.setDate(d.getDate() - n)
   return d.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+}
+function fmtDate(iso: string) {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
+/** Animated number hook */
+function useCountUp(target: number, duration = 600) {
+  const [value, setValue] = useState(0)
+  const prev = useRef(0)
+  useEffect(() => {
+    const start = prev.current
+    const diff  = target - start
+    if (diff === 0) return
+    const t0    = performance.now()
+    const frame = (t: number) => {
+      const p = Math.min((t - t0) / duration, 1)
+      setValue(Math.round(start + diff * (1 - Math.pow(1 - p, 3)))) // ease-out cubic
+      if (p < 1) requestAnimationFrame(frame)
+      else prev.current = target
+    }
+    requestAnimationFrame(frame)
+  }, [target, duration])
+  return value
 }
 
 export default function Resultados() {
@@ -33,10 +56,10 @@ export default function Resultados() {
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
 
-  const getRange = useCallback((): { start: string; end: string } => {
-    if (preset === 'hoje')   return { start: todayBRL(),       end: todayBRL() }
-    if (preset === '7d')     return { start: daysAgoBRL(6),    end: todayBRL() }
-    if (preset === '30d')    return { start: daysAgoBRL(29),   end: todayBRL() }
+  const getRange = useCallback(() => {
+    if (preset === 'hoje') return { start: todayBRL(), end: todayBRL() }
+    if (preset === '7d')   return { start: daysAgoBRL(6), end: todayBRL() }
+    if (preset === '30d')  return { start: daysAgoBRL(29), end: todayBRL() }
     return { start: customStart, end: customEnd }
   }, [preset, customStart, customEnd])
 
@@ -47,23 +70,19 @@ export default function Resultados() {
     try {
       const res = await fetch(`/api/resultados?start=${start}&end=${end}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json: ResultadosData = await res.json()
-      setData(json)
+      setData(await res.json())
     } catch (err) {
-      setError(`Erro ao carregar resultados: ${String(err)}`)
+      setError(`Erro: ${String(err)}`)
     } finally {
       setLoading(false)
     }
   }, [getRange])
 
-  // auto-fetch whenever preset / custom dates change
   useEffect(() => {
-    if (preset !== 'custom' || (customStart && customEnd)) {
-      fetchData()
-    }
-  }, [fetchData, preset, customStart, customEnd])
+    if (preset !== 'custom' || (customStart && customEnd)) fetchData()
+  }, [fetchData, preset])
 
-  const presetBtns: { id: Preset; label: string }[] = [
+  const presets: { id: Preset; label: string }[] = [
     { id: 'hoje', label: 'Hoje' },
     { id: '7d',   label: '7 dias' },
     { id: '30d',  label: '30 dias' },
@@ -72,149 +91,101 @@ export default function Resultados() {
 
   return (
     <div>
-      {/* ── Date filter bar ── */}
+      {/* Filter bar */}
       <div className="flex flex-wrap items-end gap-3 mb-8">
-        <div className="flex gap-1 bg-[#1a1a1a] border border-[#252525] rounded-xl p-1">
-          {presetBtns.map(btn => (
+        <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)', background: 'var(--surface2)' }}>
+          {presets.map(p => (
             <button
-              key={btn.id}
-              onClick={() => setPreset(btn.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                preset === btn.id
-                  ? 'bg-[#25D366] text-black'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
+              key={p.id}
+              onClick={() => setPreset(p.id)}
+              className="px-4 py-2 text-sm font-medium transition-all cursor-pointer"
+              style={{
+                background: preset === p.id ? '#25D366' : 'transparent',
+                color: preset === p.id ? '#000' : 'var(--text-2)',
+              }}
             >
-              {btn.label}
+              {p.label}
             </button>
           ))}
         </div>
 
         {preset === 'custom' && (
           <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={customStart}
-              max={customEnd}
+            <input type="date" value={customStart} max={customEnd}
               onChange={e => setCustomStart(e.target.value)}
-              className="bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-[#25D366] transition-colors cursor-pointer"
-            />
-            <span className="text-gray-600 text-sm">até</span>
-            <input
-              type="date"
-              value={customEnd}
-              min={customStart}
-              max={todayBRL()}
+              className="rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+            <span style={{ color: 'var(--text-3)' }} className="text-sm">→</span>
+            <input type="date" value={customEnd} min={customStart} max={todayBRL()}
               onChange={e => setCustomEnd(e.target.value)}
-              className="bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-[#25D366] transition-colors cursor-pointer"
-            />
+              className="rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
           </div>
         )}
 
-        <button
-          onClick={fetchData}
-          disabled={loading}
-          className="text-xs text-gray-600 border border-[#252525] hover:border-[#3a3a3a] hover:text-gray-400 disabled:opacity-40 rounded-md px-2.5 py-2 transition-colors cursor-pointer disabled:cursor-not-allowed"
-        >
-          {loading ? <SpinnerSm /> : '↻ Atualizar'}
+        <button onClick={fetchData} disabled={loading}
+          className="text-xs px-3 py-2 rounded-lg transition-all cursor-pointer hover:opacity-80 disabled:opacity-40"
+          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-2)' }}>
+          {loading ? <InlineSpin /> : '↻'}
         </button>
       </div>
 
-      {/* ── Error ── */}
       {error && (
-        <div className="text-red-400 text-sm bg-[#1f0d0d] border border-[#4d1a1a] rounded-xl p-4 mb-6">
+        <div className="rounded-xl p-4 mb-6 text-sm text-red-400" style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)' }}>
           {error}
         </div>
       )}
 
-      {/* ── Metric cards ── */}
       {loading && !data && (
-        <div className="flex items-center gap-2 text-gray-600 text-sm">
-          <SpinnerSm /> Carregando dados...
+        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-3)' }}>
+          <InlineSpin /> Carregando dados...
         </div>
       )}
 
       {data && (
-        <>
-          {/* Period label */}
-          <p className="text-xs text-gray-600 mb-4">
-            Período: <span className="text-gray-500">{formatDate(data.periodo.start)}</span>
-            {data.periodo.start !== data.periodo.end && (
-              <> → <span className="text-gray-500">{formatDate(data.periodo.end)}</span></>
-            )}
-            {loading && <span className="ml-2 text-[#25D366]">atualizando...</span>}
-          </p>
+        <div className="animate-fade-up">
+          {/* Period */}
+          <div className="flex items-center gap-2 mb-5">
+            <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+              {fmtDate(data.periodo.start)}
+              {data.periodo.start !== data.periodo.end && <> → {fmtDate(data.periodo.end)}</>}
+            </p>
+            {loading && <span className="text-xs text-[#25D366]">atualizando...</span>}
+          </div>
 
-          {/* 4 main cards */}
+          {/* Metric cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <MetricCard
-              label="Disparados"
-              value={data.disparados}
-              sublabel="contatos alcançados"
-              color="green"
-              icon="📤"
-            />
-            <MetricCard
-              label="Responderam"
-              value={data.responderam}
-              sublabel={`${data.taxaResposta}% dos disparados`}
-              color="blue"
-              icon="💬"
-            />
-            <MetricCard
-              label="Agendamentos"
-              value={data.agendados}
-              sublabel={`${data.taxaAgendamento}% dos que responderam`}
-              color="purple"
-              icon="📅"
-            />
-            <MetricCard
-              label="Pausados (IA)"
-              value={data.pausados}
-              sublabel="aguardando retomada"
-              color="yellow"
-              icon="⏸"
-            />
+            <MetricCard label="Disparados"   value={data.disparados}  sub={`${data.responderam > 0 ? data.taxaResposta + '% resp.' : '—'}`} color="#25D366" emoji="📤" />
+            <MetricCard label="Responderam"  value={data.responderam} sub={`${data.taxaResposta}% de engajamento`} color="#3b82f6" emoji="💬" />
+            <MetricCard label="Agendamentos" value={data.agendados}   sub={`${data.taxaAgendamento}% dos que responderam`} color="#a855f7" emoji="📅" />
+            <MetricCard label="Pausados (IA)"value={data.pausados}    sub="aguardando retomada" color="#f59e0b" emoji="⏸" />
           </div>
 
-          {/* Conversion funnel */}
-          <div className="bg-[#141414] border border-[#222] rounded-2xl p-6 mb-6">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-5">
+          {/* Funnel */}
+          <div className="gcard p-6 mb-5">
+            <p className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'var(--text-3)' }}>
               Funil de Conversão
-            </h3>
-            <div className="space-y-3">
-              <FunnelBar
-                label="Disparados"
-                value={data.disparados}
-                max={data.disparados}
-                color="#25D366"
-              />
-              <FunnelBar
-                label="Responderam"
-                value={data.responderam}
-                max={data.disparados}
-                color="#3b82f6"
-                pct={data.taxaResposta}
-              />
-              <FunnelBar
-                label="Agendamentos"
-                value={data.agendados}
-                max={data.disparados}
-                color="#a855f7"
-                pct={data.taxaAgendamento + '% dos que responderam'}
-              />
+            </p>
+            <div className="space-y-4">
+              <FunnelBar label="Disparados"   value={data.disparados}  max={data.disparados} color="#25D366" />
+              <FunnelBar label="Responderam"  value={data.responderam} max={data.disparados} color="#3b82f6"
+                badge={`${data.taxaResposta}%`} />
+              <FunnelBar label="Agendamentos" value={data.agendados}   max={data.disparados} color="#a855f7"
+                badge={`${data.taxaAgendamento}% dos que resp.`} />
             </div>
           </div>
 
-          {/* Total historic */}
-          <div className="bg-[#141414] border border-[#222] rounded-2xl p-5 flex items-center justify-between">
+          {/* Total histórico */}
+          <div className="gcard p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-600 uppercase tracking-wider mb-1">Total de Agendamentos (histórico)</p>
-              <p className="text-2xl font-bold text-white">{data.totalAgendados.toLocaleString('pt-BR')}</p>
+              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-3)' }}>Total histórico de agendamentos</p>
+              <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>
+                {data.totalAgendados.toLocaleString('pt-BR')}
+              </p>
             </div>
-            <span className="text-3xl opacity-30">📊</span>
+            <span className="text-4xl opacity-20">📊</span>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
@@ -222,67 +193,46 @@ export default function Resultados() {
 
 /* ── Sub-components ── */
 
-function MetricCard({
-  label, value, sublabel, color, icon,
-}: {
-  label: string; value: number; sublabel: string
-  color: 'green' | 'blue' | 'purple' | 'yellow'; icon: string
+function MetricCard({ label, value, sub, color, emoji }: {
+  label: string; value: number; sub: string; color: string; emoji: string
 }) {
-  const colors = {
-    green:  { bg: 'bg-[#0a1a0f]', border: 'border-[#1a3d25]', text: 'text-[#25D366]' },
-    blue:   { bg: 'bg-[#0a0f1f]', border: 'border-[#1a2550]', text: 'text-blue-400' },
-    purple: { bg: 'bg-[#120a1f]', border: 'border-[#2d1550]', text: 'text-purple-400' },
-    yellow: { bg: 'bg-[#1a140a]', border: 'border-[#3d2d10]', text: 'text-yellow-400' },
-  }[color]
-
+  const displayed = useCountUp(value)
   return (
-    <div className={`${colors.bg} border ${colors.border} rounded-2xl p-5`}>
-      <div className="flex items-start justify-between mb-2">
-        <span className="text-xl">{icon}</span>
-      </div>
-      <p className={`text-3xl font-bold ${colors.text} mb-1`}>
-        {value.toLocaleString('pt-BR')}
-      </p>
-      <p className="text-xs font-semibold text-gray-400 mb-0.5">{label}</p>
-      <p className="text-xs text-gray-600">{sublabel}</p>
+    <div className="gcard p-5 relative overflow-hidden">
+      {/* Accent glow */}
+      <div className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-10 blur-2xl"
+        style={{ background: color, transform: 'translate(25%, -25%)' }} />
+      <div className="text-2xl mb-3">{emoji}</div>
+      <p className="text-3xl font-bold mb-1" style={{ color }}>{displayed.toLocaleString('pt-BR')}</p>
+      <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text)' }}>{label}</p>
+      <p className="text-xs" style={{ color: 'var(--text-3)' }}>{sub}</p>
     </div>
   )
 }
 
-function FunnelBar({
-  label, value, max, color, pct,
-}: {
-  label: string; value: number; max: number
-  color: string; pct?: string
+function FunnelBar({ label, value, max, color, badge }: {
+  label: string; value: number; max: number; color: string; badge?: string
 }) {
-  const pctNum = max > 0 ? (value / max) * 100 : 0
-
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
   return (
     <div>
-      <div className="flex justify-between items-baseline mb-1.5">
-        <span className="text-sm text-gray-400">{label}</span>
+      <div className="flex justify-between items-baseline mb-2">
+        <span className="text-sm" style={{ color: 'var(--text-2)' }}>{label}</span>
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-bold text-white">{value.toLocaleString('pt-BR')}</span>
-          {pct && <span className="text-xs text-gray-600">{pct}</span>}
+          <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>{value.toLocaleString('pt-BR')}</span>
+          {badge && <span className="text-xs" style={{ color: 'var(--text-3)' }}>{badge}</span>}
         </div>
       </div>
-      <div className="h-2 bg-[#222] rounded-full overflow-hidden">
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
         <div
           className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${Math.min(pctNum, 100)}%`, backgroundColor: color }}
+          style={{ width: `${pct}%`, background: color }}
         />
       </div>
     </div>
   )
 }
 
-function SpinnerSm() {
-  return (
-    <span className="inline-block w-3.5 h-3.5 border-2 border-[#333] border-t-[#25D366] rounded-full animate-spin" />
-  )
-}
-
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
+function InlineSpin() {
+  return <span className="inline-block w-3.5 h-3.5 border-2 border-[#333] border-t-[#25D366] rounded-full animate-spin" />
 }

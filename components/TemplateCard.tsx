@@ -4,14 +4,9 @@ const CUSTO: Record<string, number> = {
   UTILITY:   parseFloat(process.env.NEXT_PUBLIC_CUSTO_UTILITY  ?? '0.0068'),
   MARKETING: parseFloat(process.env.NEXT_PUBLIC_CUSTO_MARKETING ?? '0.0625'),
 }
-
 const USD_BRL = parseFloat(process.env.NEXT_PUBLIC_USD_BRL ?? '5.70')
 
-interface Props {
-  template: Template
-  selected: boolean
-  onSelect: (t: Template) => void
-}
+interface Props { template: Template; selected: boolean; onSelect: (t: Template) => void }
 
 export default function TemplateCard({ template: t, selected, onSelect }: Props) {
   const bodyText = t.components?.find(c => c.type === 'BODY')?.text ?? '(sem corpo de texto)'
@@ -20,33 +15,46 @@ export default function TemplateCard({ template: t, selected, onSelect }: Props)
   return (
     <button
       onClick={() => onSelect(t)}
-      className={`text-left w-full rounded-2xl p-5 border-2 transition-all cursor-pointer ${
-        selected
-          ? 'border-[#25D366] bg-[#0a1a0f]'
-          : 'border-[#222] bg-[#141414] hover:border-[#2e2e2e]'
-      }`}
+      className="text-left w-full rounded-2xl p-4 border-2 transition-all cursor-pointer group"
+      style={{
+        background: selected ? 'rgba(37,211,102,.08)' : 'var(--surface)',
+        borderColor: selected ? '#25D366' : 'var(--border)',
+        boxShadow: selected ? '0 0 0 3px rgba(37,211,102,.15)' : 'none',
+      }}
+      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-h)' }}
+      onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-3">
-        <span className="font-bold text-white text-base leading-tight">{t.name}</span>
-        <div className="flex gap-1.5 flex-shrink-0">
-          <CategoryBadge category={t.category} />
-        </div>
+        <span className="font-semibold text-sm leading-tight" style={{ color: 'var(--text)' }}>
+          {t.name}
+        </span>
+        <CategoryBadge category={t.category} />
       </div>
 
       {/* Body preview */}
-      <div className="bg-[#1a1a1a] rounded-xl p-3 text-xs text-gray-400 leading-relaxed mb-3 min-h-[52px] whitespace-pre-wrap break-words">
-        {bodyText}
+      <div
+        className="rounded-xl p-3 text-xs leading-relaxed mb-3 min-h-[52px] whitespace-pre-wrap break-words"
+        style={{ background: 'var(--surface2)', color: 'var(--text-2)' }}
+      >
+        {bodyText.length > 140 ? bodyText.slice(0, 140) + '…' : bodyText}
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-2.5 border-t border-[#1e1e1e]">
-        <span className="text-xs text-gray-600">🌐 {t.language}</span>
-        <span className="text-xs text-gray-500">
-          <span className="text-gray-300 font-semibold">US$ {custo.toFixed(4)}</span> / msg
-          <span className="text-gray-600 ml-1">(~R$ {(custo * USD_BRL).toFixed(4)})</span>
+      <div className="flex items-center justify-between pt-2.5" style={{ borderTop: '1px solid var(--border)' }}>
+        <span className="text-xs" style={{ color: 'var(--text-3)' }}>🌐 {t.language}</span>
+        <span className="text-xs" style={{ color: 'var(--text-2)' }}>
+          <span className="font-bold" style={{ color: 'var(--text)' }}>US$ {custo.toFixed(4)}</span>
+          <span style={{ color: 'var(--text-3)' }}> /msg</span>
         </span>
       </div>
+
+      {selected && (
+        <div className="mt-2.5 flex items-center gap-1.5 text-[#25D366] text-xs font-semibold">
+          <span className="w-4 h-4 rounded-full bg-[#25D366] flex items-center justify-center text-black text-[10px]">✓</span>
+          Selecionado
+        </div>
+      )}
     </button>
   )
 }
@@ -54,13 +62,15 @@ export default function TemplateCard({ template: t, selected, onSelect }: Props)
 function CategoryBadge({ category }: { category: string }) {
   if (category === 'UTILITY') {
     return (
-      <span className="text-[10px] font-bold uppercase tracking-wide bg-[#0d2b18] text-[#25D366] px-2 py-0.5 rounded-full">
+      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
+        style={{ background: 'rgba(37,211,102,.15)', color: '#25D366' }}>
         Utilidade
       </span>
     )
   }
   return (
-    <span className="text-[10px] font-bold uppercase tracking-wide bg-[#2b1e08] text-amber-400 px-2 py-0.5 rounded-full">
+    <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
+      style={{ background: 'rgba(245,158,11,.15)', color: '#f59e0b' }}>
       Marketing
     </span>
   )

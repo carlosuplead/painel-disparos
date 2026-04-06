@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-// Brazil is UTC-3
-const BRL_OFFSET_HOURS = 3
-
+// Brazil UTC-3: BRL midnight = UTC 03:00
 function toBRLDate(dateStr: string, endOfDay = false): string {
   const d = new Date(dateStr)
-  d.setUTCHours(endOfDay ? 26 : 3, 0, 0, 0) // BRL midnight → UTC
+  // start: BRL 00:00 = UTC 03:00 same day
+  // end:   BRL 23:59 = UTC 02:59+1 = UTC 03:00 next day => hour 27
+  d.setUTCHours(endOfDay ? 27 : 3, 0, 0, 0)
   return d.toISOString()
 }
 
@@ -25,11 +25,40 @@ async function createClient() {
   )
 }
 
+/** Paginate a Supabase query that returns { session_id } rows, returning all unique IDs */
+async function getAllSessions(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tableName: string,
+  startUTC: string,
+  endUTC: string,
+  typeFilter?: string,
+): Promise<Set<string>> {
+  const PAGE = 1000
+  const sessions = new Set<string>()
+  let from = 0
+
+  while (true) {
+    let q = supabase
+      .from(tableName)
+      .select('session_id')
+      .gte('created_at', startUTC)
+      .lt('created_at', endUTC)
+      .range(from, from + PAGE - 1)
+
+    if (typeFilter) q = q.filter('message->>type', 'eq', typeFilter)
+
+    const { data, error } = await q
+    if (error || !data || data.length === 0) break
+    data.forEach((r: { session_id: string }) => sessions.add(r.session_id))
+    if (data.length < PAGE) break
+    from += PAGE
+  }
+  return sessions
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-
-  // start/end are YYYY-MM-DD in BRL timezone
-  const startDate = searchParams.get('start') ?? new Date().toISOString().slice(0, 10)
+  const startDate = searchParams.get('start') ?? new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
   const endDate   = searchParams.get('end')   ?? startDate
 
   const startUTC = toBRLDate(startDate, false)
@@ -37,48 +66,36 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
 
-  // ── 1. DISPARADOS: distinct session_ids com mensagem 'ai' no período ──
-  const { data: aiRows } = await supabase
-    .from('voomp_conversas')
-    .select('session_id')
-    .gte('created_at', startUTC)
-    .lt('created_at', endUTC)
-    .filter('message->>type', 'eq', 'ai')
-
-  const disparadosSessions = new Set(aiRows?.map(r => r.session_id) ?? [])
+  // ── 1. DISPARADOS: distinct sessions with 'ai' message in period (all pages) ──
+  const disparadosSessions = await getAllSessions(supabase, 'voomp_conversas', startUTC, endUTC, 'ai')
   const disparados = disparadosSessions.size
 
-  // ── 2. RESPONDERAM: sessões do período que têm msg 'human' ──
+  // ── 2. RESPONDERAM: from disparados sessions, which also have a 'human' message ──
   let responderam = 0
   if (disparadosSessions.size > 0) {
     const sessionList = [...disparadosSessions]
-
-    // Batch em chunks de 500 para não estourar o .in()
-    const CHUNK = 500
     const humanSessions = new Set<string>()
+    const CHUNK = 500
 
     for (let i = 0; i < sessionList.length; i += CHUNK) {
       const chunk = sessionList.slice(i, i + CHUNK)
-      const { data: humanRows } = await supabase
+      const { data } = await supabase
         .from('voomp_conversas')
         .select('session_id')
         .in('session_id', chunk)
         .filter('message->>type', 'eq', 'human')
-
-      humanRows?.forEach(r => humanSessions.add(r.session_id))
+      data?.forEach((r: { session_id: string }) => humanSessions.add(r.session_id))
     }
-
     responderam = humanSessions.size
   }
 
-  // ── 3. PAUSADOS: IA-VOOMP onde pausado = true ──
+  // ── 3. PAUSADOS ──
   const { count: pausados } = await supabase
     .from('IA-VOOMP')
     .select('*', { count: 'exact', head: true })
     .eq('pausado', true)
 
-  // ── 4. AGENDADOS: Voomp-Agendamentos-Otto com recebeu-disparo = SIM_RECEBEU ──
-  // Filtra por data_definida dentro do período OU por timestamp
+  // ── 4. AGENDADOS no período ──
   const { count: agendados } = await supabase
     .from('Voomp-Agendamentos-Otto')
     .select('*', { count: 'exact', head: true })
@@ -86,23 +103,22 @@ export async function GET(request: NextRequest) {
     .gte('timestamp', startUTC)
     .lt('timestamp', endUTC)
 
-  // ── 5. TOTAL AGENDAMENTOS HISTÓRICO (para comparação) ──
+  // ── 5. TOTAL AGENDAMENTOS histórico ──
   const { count: totalAgendados } = await supabase
     .from('Voomp-Agendamentos-Otto')
     .select('*', { count: 'exact', head: true })
     .eq('recebeu-disparo', 'SIM_RECEBEU')
 
-  // ── Taxas ──
-  const taxaResposta   = disparados > 0 ? ((responderam / disparados) * 100).toFixed(1) : '0'
-  const taxaAgendamento = responderam > 0 ? ((agendados ?? 0) / responderam * 100).toFixed(1) : '0'
+  const taxaResposta    = disparados > 0 ? ((responderam / disparados) * 100).toFixed(1) : '0'
+  const taxaAgendamento = responderam > 0 ? (((agendados ?? 0) / responderam) * 100).toFixed(1) : '0'
 
   return NextResponse.json({
-    periodo:          { start: startDate, end: endDate },
+    periodo: { start: startDate, end: endDate },
     disparados,
     responderam,
-    pausados:         pausados ?? 0,
-    agendados:        agendados ?? 0,
-    totalAgendados:   totalAgendados ?? 0,
+    pausados:       pausados ?? 0,
+    agendados:      agendados ?? 0,
+    totalAgendados: totalAgendados ?? 0,
     taxaResposta,
     taxaAgendamento,
   })

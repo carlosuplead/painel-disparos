@@ -1,1 +1,41 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Theme tokens ───────────────────────────────── */
+:root {
+  --bg:      #f4f6f9;
+  --surface: #ffffff;
+  --surface2:#f0f2f5;
+  --border:  #e2e6ea;
+  --border-h:#c8cdd4;
+  --text:    #111827;
+  --text-2:  #4b5563;
+  --text-3:  #9ca3af;
+}
+
+.dark {
+  --bg:      #070709;
+  --surface: #101014;
+  --surface2:#17171c;
+  --border:  #1e1e26;
+  --border-h:#2a2a36;
+  --text:    #f0f0f6;
+  --text-2:  #9090a8;
+  --text-3:  #44445a;
+}
+
+::-webkit-scrollbar       { width:5px;height:5px }
+::-webkit-scrollbar-track { background:var(--surface) }
+::-webkit-scrollbar-thumb { background:var(--border-h);border-radius:99px }
+
+@keyframes fadeUp {
+  from { opacity:0;transform:translateY(10px) }
+  to   { opacity:1;transform:translateY(0) }
+}
+.animate-fade-up { animation:fadeUp .35s ease-out forwards }
+
+.gcard {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+}
