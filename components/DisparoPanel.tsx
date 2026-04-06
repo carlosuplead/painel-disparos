@@ -9,7 +9,7 @@ const CUSTO: Record<string, number> = {
 }
 
 const USD_BRL    = parseFloat(process.env.NEXT_PUBLIC_USD_BRL ?? '5.70')
-const N8N_WEBHOOK = process.env.NEXT_PUBLIC_N8N_WEBHOOK_DISPARO ?? ''
+const N8N_WEBHOOK = '/api/disparo'
 
 type Status = { type: 'success' | 'error'; title: string; detail: string } | null
 
