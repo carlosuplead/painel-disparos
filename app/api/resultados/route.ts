@@ -89,11 +89,11 @@ export async function GET(request: NextRequest) {
     responderam = humanSessions.size
   }
 
-  // ── 3. PAUSADOS ──
+  // ── 3. FINALIZADOS PELA IA: pausado = 'true' (texto), exclui 'aguardando' e false ──
   const { count: pausados } = await supabase
     .from('IA-VOOMP')
     .select('*', { count: 'exact', head: true })
-    .eq('pausado', true)
+    .eq('pausado', 'true')
 
   // ── 4. AGENDADOS no período ──
   const { count: agendados } = await supabase

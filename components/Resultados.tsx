@@ -158,7 +158,7 @@ export default function Resultados() {
             <MetricCard label="Disparados"   value={data.disparados}  sub={`${data.responderam > 0 ? data.taxaResposta + '% resp.' : '—'}`} color="#25D366" emoji="📤" />
             <MetricCard label="Responderam"  value={data.responderam} sub={`${data.taxaResposta}% de engajamento`} color="#3b82f6" emoji="💬" />
             <MetricCard label="Agendamentos" value={data.agendados}   sub={`${data.taxaAgendamento}% dos que responderam`} color="#a855f7" emoji="📅" />
-            <MetricCard label="Pausados (IA)"value={data.pausados}    sub="aguardando retomada" color="#f59e0b" emoji="⏸" />
+            <MetricCard label="Finalizados pela IA" value={data.pausados} sub="conversas encerradas pela IA" color="#f59e0b" emoji="🤖" />
           </div>
 
           {/* Funnel */}
