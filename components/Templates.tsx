@@ -95,6 +95,8 @@ export default function Templates() {
   const [loadingList, setLoadingList] = useState(true)
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [expanded, setExpanded]       = useState<string | number | null>(null)
+  const [deleting, setDeleting]       = useState<string | null>(null)
+  const [confirmDel, setConfirmDel]   = useState<string | null>(null)
 
   const [showCreate, setShowCreate]   = useState(false)
   const [createType, setCreateType]   = useState<CreateType | null>(null)
@@ -231,6 +233,20 @@ export default function Templates() {
     }
   }
 
+  async function handleDelete(name: string) {
+    setDeleting(name)
+    try {
+      const res = await fetch(`/api/templates?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) { alert(`Erro ao excluir: ${JSON.stringify(data.error ?? data)}`); return }
+      setTemplates(ts => ts.filter(t => t.name !== name))
+      setExpanded(null)
+    } finally {
+      setDeleting(null)
+      setConfirmDel(null)
+    }
+  }
+
   function openCreate() {
     setShowCreate(true); setCreateType(null)
     setForm(defaultForm); setCreateError(''); setCreateSuccess('')
@@ -356,6 +372,31 @@ export default function Templates() {
                       </div>
                     </div>
                   )}
+
+                  {/* Delete */}
+                  <div className="pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+                    {confirmDel === t.name ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs flex-1" style={{ color: 'var(--text-2)' }}>Confirmar exclusão?</span>
+                        <button onClick={() => handleDelete(t.name)} disabled={deleting === t.name}
+                          className="text-xs px-3 py-1.5 rounded-lg font-semibold cursor-pointer hover:opacity-80 disabled:opacity-40"
+                          style={{ background: '#ef4444', color: '#fff' }}>
+                          {deleting === t.name ? <InlineSpin /> : 'Excluir'}
+                        </button>
+                        <button onClick={() => setConfirmDel(null)}
+                          className="text-xs px-3 py-1.5 rounded-lg cursor-pointer hover:opacity-80"
+                          style={{ background: 'var(--surface2)', color: 'var(--text-2)', border: '1px solid var(--border)' }}>
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setConfirmDel(t.name)}
+                        className="text-xs px-3 py-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-all"
+                        style={{ background: 'rgba(239,68,68,.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,.15)' }}>
+                        🗑 Excluir template
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

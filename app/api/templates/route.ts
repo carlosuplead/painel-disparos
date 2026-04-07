@@ -19,6 +19,26 @@ export async function GET() {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const name = request.nextUrl.searchParams.get('name')
+    if (!name) return NextResponse.json({ error: 'Nome do template obrigatório.' }, { status: 400 })
+
+    const res = await fetch(
+      `https://api.notificame.com.br/v2/channels/whatsapp/templates/${process.env.NOTIFICAME_CHANNEL}/${encodeURIComponent(name)}`,
+      {
+        method: 'DELETE',
+        headers: { 'X-Api-Token': process.env.NOTIFICAME_TOKEN! },
+      }
+    )
+    const data = await res.json()
+    if (!res.ok) return NextResponse.json({ error: data }, { status: res.status })
+    return NextResponse.json(data)
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const templateData = await request.json()
