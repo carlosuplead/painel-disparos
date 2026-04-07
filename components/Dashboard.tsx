@@ -23,7 +23,7 @@ type Tab = 'disparar' | 'resultados' | 'agendamentos' | 'agenda'
 const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: 'disparar',      label: 'Disparar',      icon: '📤' },
   { id: 'resultados',    label: 'Resultados',    icon: '📊' },
-  { id: 'agendamentos',  label: 'Agendamentos',  icon: '📋' },
+  { id: 'agendamentos',  label: 'Campanhas',     icon: '📋' },
   { id: 'agenda',        label: 'Agenda do Dia', icon: '📅' },
 ]
 

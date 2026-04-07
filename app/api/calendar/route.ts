@@ -97,18 +97,32 @@ export async function GET(request: NextRequest) {
       )
       if (!res.ok) return []
       const data = await res.json()
-      return (data.items ?? []).map((e: any) => ({
-        id:           `${cal.id}::${e.id}`,
-        title:        e.summary ?? '(sem título)',
-        start:        e.start?.dateTime ?? e.start?.date,
-        end:          e.end?.dateTime ?? e.end?.date,
-        description:  e.description ?? null,
-        attendees:    (e.attendees ?? []).map((a: any) => ({ email: a.email, name: a.displayName ?? null, self: a.self ?? false })),
-        location:     e.location ?? null,
-        link:         e.hangoutLink ?? null,
-        calendarName: cal.summary,
-        calendarColor: cal.backgroundColor ?? '#4285F4',
-      }))
+      return (data.items ?? []).map((e: any) => {
+        // Extrai link de videoconferência: hangoutLink, conferenceData ou URL na descrição/localização
+        const conferenceLink =
+          e.hangoutLink ??
+          e.conferenceData?.entryPoints?.find((ep: any) => ep.entryPointType === 'video')?.uri ??
+          null
+
+        const descText: string = e.description ?? ''
+        const locText: string  = e.location ?? ''
+        const urlMatch = (descText + ' ' + locText).match(/https?:\/\/[^\s<>"]+(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com|whereby\.com|meet\.jit\.si)[^\s<>"]*/)
+        const videoLink = conferenceLink ?? urlMatch?.[0] ?? null
+
+        return {
+          id:            `${cal.id}::${e.id}`,
+          title:         e.summary ?? '(sem título)',
+          start:         e.start?.dateTime ?? e.start?.date,
+          end:           e.end?.dateTime ?? e.end?.date,
+          description:   e.description ?? null,
+          attendees:     (e.attendees ?? []).map((a: any) => ({ email: a.email, name: a.displayName ?? null, self: a.self ?? false })),
+          location:      e.location ?? null,
+          link:          videoLink,
+          calendarName:  cal.summary,
+          calendarColor: cal.backgroundColor ?? '#4285F4',
+          calendarId:    cal.id,
+        }
+      })
     })
   )
 

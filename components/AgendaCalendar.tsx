@@ -19,7 +19,14 @@ interface CalendarEvent {
   link: string | null
   calendarName: string | null
   calendarColor: string | null
+  calendarId: string | null
 }
+
+const OWNERS = [
+  { email: 'felipemarketingperformance@gmail.com', label: 'Felipe' },
+  { email: '01.nexoaceleradora@gmail.com',         label: 'Nexo' },
+  { email: 'danielvolpi83@gmail.com',              label: 'Daniel' },
+]
 
 function fmtTime(iso: string) {
   if (!iso) return ''
@@ -36,12 +43,19 @@ function fmtDateLabel(iso: string) {
   return `${d}/${m}/${y}`
 }
 
+function ownerOf(event: CalendarEvent): string | null {
+  if (!event.calendarId) return null
+  const match = OWNERS.find(o => event.calendarId!.toLowerCase().includes(o.email.toLowerCase()))
+  return match?.email ?? null
+}
+
 export default function AgendaCalendar() {
-  const [date, setDate]       = useState(todayBRL())
-  const [events, setEvents]   = useState<CalendarEvent[]>([])
-  const [connected, setConn]  = useState<boolean | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [date, setDate]         = useState(todayBRL())
+  const [events, setEvents]     = useState<CalendarEvent[]>([])
+  const [connected, setConn]    = useState<boolean | null>(null)
+  const [loading, setLoading]   = useState(false)
   const [selected, setSelected] = useState<CalendarEvent | null>(null)
+  const [filter, setFilter]     = useState<string>('all')
 
   async function fetchEvents(d: string) {
     setLoading(true)
@@ -57,7 +71,6 @@ export default function AgendaCalendar() {
 
   useEffect(() => { fetchEvents(date) }, [date])
 
-  // Detecta ?google=connected na URL após OAuth
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('google') === 'connected') {
@@ -83,10 +96,23 @@ export default function AgendaCalendar() {
     )
   }
 
+  // Contagem por owner
+  const countByOwner = OWNERS.reduce<Record<string, number>>((acc, o) => {
+    acc[o.email] = events.filter(e => ownerOf(e) === o.email).length
+    return acc
+  }, {})
+  const countOther = events.filter(e => ownerOf(e) === null).length
+
+  const filtered = filter === 'all'
+    ? events
+    : filter === 'other'
+    ? events.filter(e => ownerOf(e) === null)
+    : events.filter(e => ownerOf(e) === filter)
+
   return (
     <div>
-      {/* Header com data e botão reconectar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-3">
           <input
             type="date"
@@ -101,14 +127,24 @@ export default function AgendaCalendar() {
             {loading ? <InlineSpin /> : '↻'}
           </button>
         </div>
-        <a href="/api/auth/google" className="text-xs hover:opacity-70 transition-all"
-          style={{ color: 'var(--text-3)' }}>
+        <a href="/api/auth/google" className="text-xs hover:opacity-70 transition-all" style={{ color: 'var(--text-3)' }}>
           Reconectar Google ↗
         </a>
       </div>
 
+      {/* Filtros por pessoa + contadores */}
+      <div className="flex flex-wrap gap-2 mb-5">
+        <FilterBtn label="Todos" count={events.length} active={filter === 'all'} onClick={() => setFilter('all')} color="#4285F4" />
+        {OWNERS.map(o => (
+          <FilterBtn key={o.email} label={o.label} count={countByOwner[o.email] ?? 0} active={filter === o.email} onClick={() => setFilter(o.email)} color="#25D366" />
+        ))}
+        {countOther > 0 && (
+          <FilterBtn label="Outros" count={countOther} active={filter === 'other'} onClick={() => setFilter('other')} color="#f59e0b" />
+        )}
+      </div>
+
       {/* Sem eventos */}
-      {!loading && events.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="gcard p-10 flex flex-col items-center gap-3">
           <span className="text-4xl opacity-30">📭</span>
           <p className="text-sm" style={{ color: 'var(--text-3)' }}>Nenhum evento em {fmtDateLabel(date)}</p>
@@ -117,12 +153,12 @@ export default function AgendaCalendar() {
 
       {/* Lista de eventos */}
       <div className="space-y-3">
-        {events.map(event => (
+        {filtered.map(event => (
           <button key={event.id} onClick={() => setSelected(event)}
             className="w-full gcard p-4 flex items-start gap-4 text-left hover:opacity-80 transition-all cursor-pointer">
             {/* Horário */}
             <div className="flex-shrink-0 text-right min-w-[52px]">
-              <p className="text-sm font-bold" style={{ color: '#4285F4' }}>{fmtTime(event.start)}</p>
+              <p className="text-sm font-bold" style={{ color: event.calendarColor ?? '#4285F4' }}>{fmtTime(event.start)}</p>
               <p className="text-xs" style={{ color: 'var(--text-3)' }}>{fmtTime(event.end)}</p>
             </div>
 
@@ -141,24 +177,24 @@ export default function AgendaCalendar() {
                 <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-3)' }}>📍 {event.location}</p>
               )}
               {event.calendarName && (
-                <p className="text-xs mt-0.5 truncate" style={{ color: event.calendarColor ?? '#4285F4', opacity: 0.8 }}>● {event.calendarName}</p>
+                <p className="text-xs mt-0.5 truncate font-medium" style={{ color: event.calendarColor ?? '#4285F4' }}>● {event.calendarName}</p>
               )}
             </div>
 
-            {/* Meet link */}
+            {/* Meet / Video link */}
             {event.link && (
               <a href={event.link} target="_blank" rel="noreferrer"
                 onClick={e => e.stopPropagation()}
                 className="flex-shrink-0 text-xs px-2.5 py-1.5 rounded-lg font-medium hover:opacity-80 transition-all"
                 style={{ background: 'rgba(66,133,244,.15)', color: '#4285F4' }}>
-                Meet
+                Meet ↗
               </a>
             )}
           </button>
         ))}
       </div>
 
-      {/* Modal do evento */}
+      {/* Modal */}
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.6)' }}
@@ -167,18 +203,19 @@ export default function AgendaCalendar() {
             style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
             onClick={e => e.stopPropagation()}>
 
-            {/* Header */}
             <div className="flex items-start justify-between mb-5">
               <div className="flex-1 min-w-0 pr-3">
                 <p className="font-bold text-base" style={{ color: 'var(--text)' }}>{selected.title}</p>
-                <p className="text-sm mt-0.5" style={{ color: '#4285F4' }}>
+                <p className="text-sm mt-0.5" style={{ color: selected.calendarColor ?? '#4285F4' }}>
                   {fmtTime(selected.start)} → {fmtTime(selected.end)}
                 </p>
+                {selected.calendarName && (
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>● {selected.calendarName}</p>
+                )}
               </div>
               <button onClick={() => setSelected(null)} className="text-lg cursor-pointer hover:opacity-60" style={{ color: 'var(--text-3)' }}>✕</button>
             </div>
 
-            {/* Participantes */}
             {selected.attendees.length > 0 && (
               <div className="rounded-xl p-4 mb-3" style={{ background: 'var(--surface2)' }}>
                 <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Participantes</p>
@@ -199,7 +236,6 @@ export default function AgendaCalendar() {
               </div>
             )}
 
-            {/* Local */}
             {selected.location && (
               <div className="rounded-xl p-3 mb-3 flex items-center gap-2" style={{ background: 'var(--surface2)' }}>
                 <span>📍</span>
@@ -207,16 +243,14 @@ export default function AgendaCalendar() {
               </div>
             )}
 
-            {/* Meet */}
             {selected.link && (
               <a href={selected.link} target="_blank" rel="noreferrer"
                 className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold mb-3 hover:opacity-80 transition-all"
                 style={{ background: '#4285F4', color: '#fff' }}>
-                Entrar no Google Meet ↗
+                Entrar na reunião ↗
               </a>
             )}
 
-            {/* Descrição */}
             {selected.description && (
               <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
                 <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Descrição</p>
@@ -227,6 +261,24 @@ export default function AgendaCalendar() {
         </div>
       )}
     </div>
+  )
+}
+
+function FilterBtn({ label, count, active, onClick, color }: { label: string; count: number; active: boolean; onClick: () => void; color: string }) {
+  return (
+    <button onClick={onClick}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer"
+      style={{
+        background: active ? `${color}22` : 'var(--surface2)',
+        color: active ? color : 'var(--text-2)',
+        border: `1px solid ${active ? color + '44' : 'var(--border)'}`,
+      }}>
+      {label}
+      <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+        style={{ background: active ? `${color}33` : 'var(--surface)', color: active ? color : 'var(--text-3)' }}>
+        {count}
+      </span>
+    </button>
   )
 }
 
