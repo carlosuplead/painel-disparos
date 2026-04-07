@@ -26,16 +26,18 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createClient()
-  const now = new Date().toISOString()
+
+  // Horário atual em BRL (coluna scheduled_at é TIMESTAMP sem fuso, salvo em BRL)
+  const nowBRL = new Date().toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).replace(' ', 'T')
 
   // ── ATOMIC CLAIM: muda status para 'processando' antes de disparar ──
-  // Isso garante que mesmo se dois crons rodarem ao mesmo tempo,
+  // Garante que mesmo se dois crons rodarem ao mesmo tempo,
   // cada agendamento só vai ser disparado UMA VEZ.
   const { data: claimed, error: claimError } = await supabase
     .from('disparos_agendados')
-    .update({ status: 'processando', fired_at: now })
-    .eq('status', 'pendente')        // só pega os pendentes
-    .lte('scheduled_at', now)        // só os que já venceram
+    .update({ status: 'processando', fired_at: nowBRL })
+    .eq('status', 'pendente')
+    .lte('scheduled_at', nowBRL)
     .select()
 
   if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 })
