@@ -36,9 +36,8 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
 
-  // ── 1. DISPARADOS: sessões cuja PRIMEIRA mensagem 'ai' está no período ──
-  // Usa RPC para evitar contagem inflada por follow-ups de sessões antigas
-  const { data: dispData } = await supabase.rpc('count_disparados', {
+  // ── 1. DISPARADOS: sessões distintas com msg 'ai' no período ──
+  const { data: dispData, error: dispError } = await supabase.rpc('count_disparados', {
     start_utc: startUTC,
     end_utc: endUTC,
   })
@@ -52,7 +51,11 @@ export async function GET(request: NextRequest) {
     .gte('Timestamp', startDate)
     .lte('Timestamp', endDate + 'T23:59:59')
   const responderam: number = respCount ?? 0
-  const debugResp = { respCount, respError: respError?.message ?? null, startDate, endDate }
+  const debugResp = {
+    respCount, respError: respError?.message ?? null,
+    dispData, dispError: dispError?.message ?? null,
+    startUTC, endUTC
+  }
 
   // ── 3. FINALIZADOS PELA IA: pausado = 'true', filtrado por Timestamp (texto ISO) no período BRL ──
   const { count: pausados } = await supabase
