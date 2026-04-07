@@ -108,12 +108,10 @@ export async function GET(request: NextRequest) {
         const descText: string = stripHtml(e.description ?? '')
         const locText: string  = e.location ?? ''
         const searchText = descText + ' ' + locText
-        // Tenta com protocolo primeiro, depois sem (ex: "meet.google.com/xxx")
-        const urlMatch =
-          searchText.match(/https?:\/\/[^\s<>"]*(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com|whereby\.com|meet\.jit\.si)[^\s<>"]*/) ??
-          searchText.match(/(?:^|\s)(meet\.google\.com\/[a-z0-9\-]+)/m)
-        const rawUrl = urlMatch?.[1] ?? urlMatch?.[0] ?? null
-        const videoLink = conferenceLink ?? (rawUrl ? (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl.trim()}`) : null)
+        const urlMatch = searchText.match(/https?:\/\/[^\s<>"]*(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com)[^\s<>"]*/) ??
+                         searchText.match(/meet\.google\.com\/[a-z0-9\-]+/)
+        const rawUrl = urlMatch?.[0]?.trim() ?? null
+        const videoLink = conferenceLink ?? (rawUrl ? (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`) : null)
 
         return {
           id:             `${cal.id}::${e.id}`,
