@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-// This endpoint is called by Vercel Cron (or external cron-job.org)
-// It checks for pending scheduled dispatches that are due and fires the n8n webhook
-
 async function createClient() {
   const cookieStore = await cookies()
   return createServerClient(
@@ -20,7 +17,6 @@ async function createClient() {
 }
 
 export async function GET(request: NextRequest) {
-  // Optional: verify cron secret to prevent unauthorized calls
   const secret = request.headers.get('x-cron-secret') ?? new URL(request.url).searchParams.get('secret')
   if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -29,20 +25,23 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const now = new Date().toISOString()
 
-  // Find pending dispatches that are due
-  const { data: pending, error } = await supabase
+  // ── ATOMIC CLAIM: muda status para 'processando' antes de disparar ──
+  // Isso garante que mesmo se dois crons rodarem ao mesmo tempo,
+  // cada agendamento só vai ser disparado UMA VEZ.
+  const { data: claimed, error: claimError } = await supabase
     .from('disparos_agendados')
-    .select('*')
-    .eq('status', 'pendente')
-    .lte('scheduled_at', now)
+    .update({ status: 'processando', fired_at: now })
+    .eq('status', 'pendente')        // só pega os pendentes
+    .lte('scheduled_at', now)        // só os que já venceram
+    .select()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!pending || pending.length === 0) return NextResponse.json({ fired: 0 })
+  if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 })
+  if (!claimed || claimed.length === 0) return NextResponse.json({ fired: 0 })
 
   const n8nUrl = process.env.N8N_WEBHOOK_DISPARO ?? process.env.NEXT_PUBLIC_N8N_WEBHOOK_DISPARO ?? ''
   const results: { id: string; status: string }[] = []
 
-  for (const item of pending) {
+  for (const item of claimed) {
     try {
       const res = await fetch(n8nUrl, {
         method: 'POST',
@@ -53,14 +52,14 @@ export async function GET(request: NextRequest) {
       const newStatus = res.ok ? 'disparado' : 'erro'
       await supabase
         .from('disparos_agendados')
-        .update({ status: newStatus, fired_at: new Date().toISOString() })
+        .update({ status: newStatus })
         .eq('id', item.id)
 
       results.push({ id: item.id, status: newStatus })
     } catch {
       await supabase
         .from('disparos_agendados')
-        .update({ status: 'erro', fired_at: new Date().toISOString() })
+        .update({ status: 'erro' })
         .eq('id', item.id)
       results.push({ id: item.id, status: 'erro' })
     }

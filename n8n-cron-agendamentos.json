@@ -1,0 +1,36 @@
+{
+  "name": "Disparos API OFC — Cron Agendamentos",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "A cada 5 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://painel-disparos.vercel.app/api/cron/disparo",
+        "options": {}
+      },
+      "id": "http-cron",
+      "name": "Disparar agendamentos pendentes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "A cada 5 minutos": {
+      "main": [[{ "node": "Disparar agendamentos pendentes", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": true
+}
