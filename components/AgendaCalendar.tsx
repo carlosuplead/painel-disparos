@@ -25,7 +25,7 @@ interface CalendarEvent {
 
 const OWNERS = [
   { email: 'felipemarketingperformance@gmail.com', label: 'Felipe' },
-  { email: '01.nexoaceleradora@gmail.com',         label: 'Nexo' },
+  { email: '01.nexoaceleradora@gmail.com',         label: '01.nexo' },
   { email: 'danielvolpi83@gmail.com',              label: 'Daniel' },
 ]
 
