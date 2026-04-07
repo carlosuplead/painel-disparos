@@ -53,19 +53,19 @@ function ownerOf(event: CalendarEvent): string | null {
   const byCalId = OWNERS.find(o => calId === o.email.toLowerCase() || calId.includes(o.email.toLowerCase()))
   if (byCalId) return byCalId.email
 
-  // 2. nome do calendário contém um dos termos do dono (mais confiável que attendees)
-  const byCalName = OWNERS.find(o => o.terms.some(t => calName.includes(t)))
-  if (byCalName) return byCalName.email
-
-  // 3. organizador do evento é um dos donos
+  // 2. organizador do evento é um dos donos
   const byOrganizer = OWNERS.find(o => organizer === o.email.toLowerCase())
   if (byOrganizer) return byOrganizer.email
 
-  // 4. attendee é um dos donos
+  // 3. attendee é um dos donos (Felipe/Daniel têm prioridade sobre nome do calendário)
   const byAttendee = OWNERS.find(o =>
     event.attendees.some(a => a.email.toLowerCase() === o.email.toLowerCase())
   )
-  return byAttendee?.email ?? null
+  if (byAttendee) return byAttendee.email
+
+  // 4. nome do calendário como último recurso (ex: evento sem attendees no Vendas01)
+  const byCalName = OWNERS.find(o => o.terms.some(t => calName.includes(t)))
+  return byCalName?.email ?? null
 }
 
 function ownerLabel(event: CalendarEvent): string | null {
