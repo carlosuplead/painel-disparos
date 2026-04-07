@@ -7,6 +7,7 @@ import TemplateCard from '@/components/TemplateCard'
 import DisparoPanel from '@/components/DisparoPanel'
 import Resultados from '@/components/Resultados'
 import Agendamentos from '@/components/Agendamentos'
+import AgendaCalendar from '@/components/AgendaCalendar'
 
 export interface Template {
   id: string
@@ -17,12 +18,13 @@ export interface Template {
   components: { type: string; text?: string }[]
 }
 
-type Tab = 'disparar' | 'resultados' | 'agendamentos'
+type Tab = 'disparar' | 'resultados' | 'agendamentos' | 'agenda'
 
 const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: 'disparar',      label: 'Disparar',      icon: '📤' },
   { id: 'resultados',    label: 'Resultados',    icon: '📊' },
-  { id: 'agendamentos',  label: 'Agendamentos',  icon: '📅' },
+  { id: 'agendamentos',  label: 'Agendamentos',  icon: '📋' },
+  { id: 'agenda',        label: 'Agenda do Dia', icon: '📅' },
 ]
 
 export default function Dashboard({ userEmail }: { userEmail: string }) {
@@ -241,6 +243,13 @@ export default function Dashboard({ userEmail }: { userEmail: string }) {
           {tab === 'agendamentos' && (
             <div className="animate-fade-up">
               <Agendamentos templates={templates.map(t => ({ id: t.id, name: t.name, language: t.language, category: t.category }))} />
+            </div>
+          )}
+
+          {/* ── Tab: Agenda do Dia ── */}
+          {tab === 'agenda' && (
+            <div className="animate-fade-up">
+              <AgendaCalendar />
             </div>
           )}
 

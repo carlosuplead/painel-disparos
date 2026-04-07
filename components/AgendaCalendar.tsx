@@ -1,0 +1,230 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+
+interface Attendee {
+  email: string
+  name: string | null
+  self: boolean
+}
+
+interface CalendarEvent {
+  id: string
+  title: string
+  start: string
+  end: string
+  description: string | null
+  attendees: Attendee[]
+  location: string | null
+  link: string | null
+}
+
+function fmtTime(iso: string) {
+  if (!iso) return ''
+  if (!iso.includes('T')) return 'dia todo'
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
+}
+
+function todayBRL() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+}
+
+function fmtDateLabel(iso: string) {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
+export default function AgendaCalendar() {
+  const [date, setDate]       = useState(todayBRL())
+  const [events, setEvents]   = useState<CalendarEvent[]>([])
+  const [connected, setConn]  = useState<boolean | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [selected, setSelected] = useState<CalendarEvent | null>(null)
+
+  async function fetchEvents(d: string) {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/calendar?date=${d}`)
+      const data = await res.json()
+      setConn(data.connected)
+      setEvents(data.events ?? [])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchEvents(date) }, [date])
+
+  // Detecta ?google=connected na URL após OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('google') === 'connected') {
+      window.history.replaceState({}, '', window.location.pathname)
+      fetchEvents(date)
+    }
+  }, [])
+
+  if (connected === false) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="text-5xl">📅</div>
+        <p className="font-semibold" style={{ color: 'var(--text)' }}>Google Calendar não conectado</p>
+        <p className="text-sm text-center max-w-xs" style={{ color: 'var(--text-3)' }}>
+          Conecte sua conta Google para visualizar os eventos da agenda do dia.
+        </p>
+        <a href="/api/auth/google"
+          className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
+          style={{ background: '#4285F4', color: '#fff' }}>
+          Conectar Google Calendar
+        </a>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Header com data e botão reconectar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
+            style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
+          />
+          <button onClick={() => fetchEvents(date)} disabled={loading}
+            className="text-xs px-3 py-2 rounded-lg transition-all cursor-pointer hover:opacity-80 disabled:opacity-40"
+            style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-2)' }}>
+            {loading ? <InlineSpin /> : '↻'}
+          </button>
+        </div>
+        <a href="/api/auth/google" className="text-xs hover:opacity-70 transition-all"
+          style={{ color: 'var(--text-3)' }}>
+          Reconectar Google ↗
+        </a>
+      </div>
+
+      {/* Sem eventos */}
+      {!loading && events.length === 0 && (
+        <div className="gcard p-10 flex flex-col items-center gap-3">
+          <span className="text-4xl opacity-30">📭</span>
+          <p className="text-sm" style={{ color: 'var(--text-3)' }}>Nenhum evento em {fmtDateLabel(date)}</p>
+        </div>
+      )}
+
+      {/* Lista de eventos */}
+      <div className="space-y-3">
+        {events.map(event => (
+          <button key={event.id} onClick={() => setSelected(event)}
+            className="w-full gcard p-4 flex items-start gap-4 text-left hover:opacity-80 transition-all cursor-pointer">
+            {/* Horário */}
+            <div className="flex-shrink-0 text-right min-w-[52px]">
+              <p className="text-sm font-bold" style={{ color: '#4285F4' }}>{fmtTime(event.start)}</p>
+              <p className="text-xs" style={{ color: 'var(--text-3)' }}>{fmtTime(event.end)}</p>
+            </div>
+
+            {/* Barra colorida */}
+            <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: '#4285F4', opacity: 0.6 }} />
+
+            {/* Conteúdo */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{event.title}</p>
+              {event.attendees.length > 0 && (
+                <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-3)' }}>
+                  {event.attendees.filter(a => !a.self).map(a => a.name ?? a.email).join(', ') || 'Sem participantes'}
+                </p>
+              )}
+              {event.location && (
+                <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-3)' }}>📍 {event.location}</p>
+              )}
+            </div>
+
+            {/* Meet link */}
+            {event.link && (
+              <a href={event.link} target="_blank" rel="noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="flex-shrink-0 text-xs px-2.5 py-1.5 rounded-lg font-medium hover:opacity-80 transition-all"
+                style={{ background: 'rgba(66,133,244,.15)', color: '#4285F4' }}>
+                Meet
+              </a>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Modal do evento */}
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setSelected(null)}>
+          <div className="w-full max-w-lg rounded-2xl p-6 max-h-[80vh] overflow-y-auto"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-start justify-between mb-5">
+              <div className="flex-1 min-w-0 pr-3">
+                <p className="font-bold text-base" style={{ color: 'var(--text)' }}>{selected.title}</p>
+                <p className="text-sm mt-0.5" style={{ color: '#4285F4' }}>
+                  {fmtTime(selected.start)} → {fmtTime(selected.end)}
+                </p>
+              </div>
+              <button onClick={() => setSelected(null)} className="text-lg cursor-pointer hover:opacity-60" style={{ color: 'var(--text-3)' }}>✕</button>
+            </div>
+
+            {/* Participantes */}
+            {selected.attendees.length > 0 && (
+              <div className="rounded-xl p-4 mb-3" style={{ background: 'var(--surface2)' }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Participantes</p>
+                <div className="space-y-1.5">
+                  {selected.attendees.map((a, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                        style={{ background: 'rgba(66,133,244,.15)', color: '#4285F4' }}>
+                        {(a.name ?? a.email).charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        {a.name && <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{a.name} {a.self ? '(você)' : ''}</p>}
+                        <p className="text-xs truncate" style={{ color: 'var(--text-3)' }}>{a.email}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Local */}
+            {selected.location && (
+              <div className="rounded-xl p-3 mb-3 flex items-center gap-2" style={{ background: 'var(--surface2)' }}>
+                <span>📍</span>
+                <p className="text-sm" style={{ color: 'var(--text)' }}>{selected.location}</p>
+              </div>
+            )}
+
+            {/* Meet */}
+            {selected.link && (
+              <a href={selected.link} target="_blank" rel="noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold mb-3 hover:opacity-80 transition-all"
+                style={{ background: '#4285F4', color: '#fff' }}>
+                Entrar no Google Meet ↗
+              </a>
+            )}
+
+            {/* Descrição */}
+            {selected.description && (
+              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Descrição</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{selected.description}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InlineSpin() {
+  return <span className="inline-block w-3.5 h-3.5 border-2 border-[#333] border-t-[#4285F4] rounded-full animate-spin" />
+}
