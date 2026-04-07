@@ -25,36 +25,6 @@ async function createClient() {
   )
 }
 
-/** Paginate a Supabase query that returns { session_id } rows, returning all unique IDs */
-async function getAllSessions(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  tableName: string,
-  startUTC: string,
-  endUTC: string,
-  typeFilter?: string,
-): Promise<Set<string>> {
-  const PAGE = 1000
-  const sessions = new Set<string>()
-  let from = 0
-
-  while (true) {
-    let q = supabase
-      .from(tableName)
-      .select('session_id')
-      .gte('created_at', startUTC)
-      .lt('created_at', endUTC)
-      .range(from, from + PAGE - 1)
-
-    if (typeFilter) q = q.filter('message->>type', 'eq', typeFilter)
-
-    const { data, error } = await q
-    if (error || !data || data.length === 0) break
-    data.forEach((r: { session_id: string }) => sessions.add(r.session_id))
-    if (data.length < PAGE) break
-    from += PAGE
-  }
-  return sessions
-}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -74,12 +44,15 @@ export async function GET(request: NextRequest) {
   })
   const disparados: number = dispData ?? 0
 
-  // ── 2. RESPONDERAM: das sessões disparadas no período, quais têm msg 'human' ──
-  const { data: respData } = await supabase.rpc('count_responderam', {
-    start_utc: startUTC,
-    end_utc: endUTC,
-  })
-  const responderam: number = respData ?? 0
+  // ── 2. RESPONDERAM: leads na IA-VOOMP com Timestamp no período ──
+  // Timestamp é atualizado sempre que o lead responde → conta quem interagiu no período
+  const { count: respCount, error: respError } = await supabase
+    .from('IA-VOOMP')
+    .select('*', { count: 'exact', head: true })
+    .gte('Timestamp', startDate)
+    .lte('Timestamp', endDate + 'T23:59:59')
+  const responderam: number = respCount ?? 0
+  const debugResp = { respCount, respError: respError?.message ?? null, startDate, endDate }
 
   // ── 3. FINALIZADOS PELA IA: pausado = 'true', filtrado por Timestamp (texto ISO) no período BRL ──
   const { count: pausados } = await supabase
@@ -110,6 +83,7 @@ export async function GET(request: NextRequest) {
     periodo: { start: startDate, end: endDate },
     disparados,
     responderam,
+    _debug: debugResp,
     pausados:       pausados ?? 0,
     agendados:      agendados ?? 0,
     totalAgendados: totalAgendados ?? 0,
