@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
   const [
     { data: dispData },
-    { count: respCount },
+    { data: respCount },
     { count: pausados },
     { count: agendados },
     { count: totalAgendados },
