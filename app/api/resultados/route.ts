@@ -66,28 +66,20 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
 
-  // ── 1. DISPARADOS: distinct sessions with 'ai' message in period (all pages) ──
-  const disparadosSessions = await getAllSessions(supabase, 'voomp_conversas', startUTC, endUTC, 'ai')
-  const disparados = disparadosSessions.size
+  // ── 1. DISPARADOS: sessões cuja PRIMEIRA mensagem 'ai' está no período ──
+  // Usa RPC para evitar contagem inflada por follow-ups de sessões antigas
+  const { data: dispData } = await supabase.rpc('count_disparados', {
+    start_utc: startUTC,
+    end_utc: endUTC,
+  })
+  const disparados: number = dispData ?? 0
 
-  // ── 2. RESPONDERAM: from disparados sessions, which also have a 'human' message ──
-  let responderam = 0
-  if (disparadosSessions.size > 0) {
-    const sessionList = [...disparadosSessions]
-    const humanSessions = new Set<string>()
-    const CHUNK = 500
-
-    for (let i = 0; i < sessionList.length; i += CHUNK) {
-      const chunk = sessionList.slice(i, i + CHUNK)
-      const { data } = await supabase
-        .from('voomp_conversas')
-        .select('session_id')
-        .in('session_id', chunk)
-        .filter('message->>type', 'eq', 'human')
-      data?.forEach((r: { session_id: string }) => humanSessions.add(r.session_id))
-    }
-    responderam = humanSessions.size
-  }
+  // ── 2. RESPONDERAM: das sessões disparadas no período, quais têm msg 'human' ──
+  const { data: respData } = await supabase.rpc('count_responderam', {
+    start_utc: startUTC,
+    end_utc: endUTC,
+  })
+  const responderam: number = respData ?? 0
 
   // ── 3. FINALIZADOS PELA IA: pausado = 'true' (texto), exclui 'aguardando' e false ──
   const { count: pausados } = await supabase
