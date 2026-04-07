@@ -44,9 +44,20 @@ function fmtDateLabel(iso: string) {
 }
 
 function ownerOf(event: CalendarEvent): string | null {
-  if (!event.calendarId) return null
-  const match = OWNERS.find(o => event.calendarId!.toLowerCase().includes(o.email.toLowerCase()))
+  const calId   = (event.calendarId   ?? '').toLowerCase()
+  const calName = (event.calendarName ?? '').toLowerCase()
+  const match = OWNERS.find(o =>
+    calId === o.email.toLowerCase() ||
+    calId.includes(o.email.toLowerCase()) ||
+    calName.includes(o.label.toLowerCase()) ||
+    calName.includes(o.email.split('@')[0].toLowerCase())
+  )
   return match?.email ?? null
+}
+
+function ownerLabel(event: CalendarEvent): string | null {
+  const email = ownerOf(event)
+  return OWNERS.find(o => o.email === email)?.label ?? null
 }
 
 export default function AgendaCalendar() {
@@ -176,9 +187,17 @@ export default function AgendaCalendar() {
               {event.location && (
                 <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-3)' }}>📍 {event.location}</p>
               )}
-              {event.calendarName && (
-                <p className="text-xs mt-0.5 truncate font-medium" style={{ color: event.calendarColor ?? '#4285F4' }}>● {event.calendarName}</p>
-              )}
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                {event.calendarName && (
+                  <p className="text-xs truncate" style={{ color: event.calendarColor ?? '#4285F4' }}>● {event.calendarName}</p>
+                )}
+                {ownerLabel(event) && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
+                    style={{ background: 'rgba(37,211,102,.15)', color: '#25D366' }}>
+                    {ownerLabel(event)}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Meet / Video link */}

@@ -104,7 +104,8 @@ export async function GET(request: NextRequest) {
           e.conferenceData?.entryPoints?.find((ep: any) => ep.entryPointType === 'video')?.uri ??
           null
 
-        const descText: string = e.description ?? ''
+        const stripHtml = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/&#?\w+;/g, ' ')
+        const descText: string = stripHtml(e.description ?? '')
         const locText: string  = e.location ?? ''
         const urlMatch = (descText + ' ' + locText).match(/https?:\/\/[^\s<>"]+(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com|whereby\.com|meet\.jit\.si)[^\s<>"]*/)
         const videoLink = conferenceLink ?? urlMatch?.[0] ?? null
