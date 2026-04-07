@@ -68,8 +68,7 @@ export async function GET(request: NextRequest) {
       .select('id, nome, email, telefone, data_definida, resumo, timestamp')
       .eq('recebeu-disparo', 'SIM_RECEBEU')
       .gte('timestamp', startUTC).lt('timestamp', endUTC)
-      .order('timestamp', { ascending: false })
-      .limit(100),
+      .order('timestamp', { ascending: false }),
 
     // 7. FOLLOWUP DISTRIBUTION
     supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
