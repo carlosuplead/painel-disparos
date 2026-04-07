@@ -78,9 +78,8 @@ export default function AgendaCalendar() {
   const [connected, setConn]      = useState<boolean | null>(null)
   const [loading, setLoading]     = useState(false)
   const [selected, setSelected]   = useState<CalendarEvent | null>(null)
-  const [filter, setFilter]       = useState<string>('all')
-  const [hiddenTitles, setHidden] = useState<Set<string>>(new Set())
-  const [showHidePanel, setShowHidePanel] = useState(false)
+  const [filter, setFilter]           = useState<string>('all')
+  const [hideFixed, setHideFixed]     = useState(true) // oculta agendas sem participantes por padrão
 
   async function fetchEvents(d: string) {
     setLoading(true)
@@ -121,31 +120,22 @@ export default function AgendaCalendar() {
     )
   }
 
-  // Títulos únicos para o painel de ocultar
-  const uniqueTitles = Array.from(new Set(events.map(e => e.title))).sort()
+  // "Agenda fixa" = evento sem participantes externos
+  const isFixed = (e: CalendarEvent) => e.attendees.filter(a => !a.self).length === 0
 
-  function toggleHide(title: string) {
-    setHidden(prev => {
-      const next = new Set(prev)
-      next.has(title) ? next.delete(title) : next.add(title)
-      return next
-    })
-  }
+  const visibleEvents = hideFixed ? events.filter(e => !isFixed(e)) : events
 
-  // Contagem por owner (antes de ocultar títulos)
   const countByOwner = OWNERS.reduce<Record<string, number>>((acc, o) => {
-    acc[o.email] = events.filter(e => ownerOf(e) === o.email && !hiddenTitles.has(e.title)).length
+    acc[o.email] = visibleEvents.filter(e => ownerOf(e) === o.email).length
     return acc
   }, {})
-  const countOther = events.filter(e => ownerOf(e) === null && !hiddenTitles.has(e.title)).length
+  const countOther = visibleEvents.filter(e => ownerOf(e) === null).length
 
-  const filtered = events
-    .filter(e => !hiddenTitles.has(e.title))
-    .filter(e =>
-      filter === 'all'   ? true :
-      filter === 'other' ? ownerOf(e) === null :
-      ownerOf(e) === filter
-    )
+  const filtered = visibleEvents.filter(e =>
+    filter === 'all'   ? true :
+    filter === 'other' ? ownerOf(e) === null :
+    ownerOf(e) === filter
+  )
 
   return (
     <div>
@@ -166,46 +156,20 @@ export default function AgendaCalendar() {
           </button>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setShowHidePanel(v => !v)}
-            className="text-xs px-3 py-2 rounded-lg transition-all cursor-pointer hover:opacity-80 flex items-center gap-1.5"
-            style={{ background: showHidePanel ? 'rgba(239,68,68,.1)' : 'var(--surface2)', border: `1px solid ${showHidePanel ? 'rgba(239,68,68,.3)' : 'var(--border)'}`, color: showHidePanel ? '#ef4444' : 'var(--text-2)' }}>
-            {showHidePanel ? '✕ Fechar' : '⚙ Ocultar eventos'}
-            {hiddenTitles.size > 0 && <span className="rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold" style={{ background: '#ef4444', color: '#fff' }}>{hiddenTitles.size}</span>}
-          </button>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <div onClick={() => setHideFixed(v => !v)}
+              className="w-9 h-5 rounded-full transition-all flex-shrink-0 flex items-center px-0.5"
+              style={{ background: hideFixed ? '#25D366' : 'var(--border)', cursor: 'pointer' }}>
+              <div className="w-4 h-4 rounded-full bg-white shadow transition-transform"
+                style={{ transform: hideFixed ? 'translateX(16px)' : 'translateX(0)' }} />
+            </div>
+            <span className="text-xs" style={{ color: 'var(--text-2)' }}>Ocultar agendas fixas</span>
+          </label>
           <a href="/api/auth/google" className="text-xs hover:opacity-70 transition-all" style={{ color: 'var(--text-3)' }}>
             Reconectar ↗
           </a>
         </div>
       </div>
-
-      {/* Painel de ocultar títulos */}
-      {showHidePanel && (
-        <div className="rounded-xl p-4 mb-5" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-          <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-3)' }}>Selecione os eventos para ocultar</p>
-          <div className="flex flex-wrap gap-2">
-            {uniqueTitles.map(title => {
-              const hidden = hiddenTitles.has(title)
-              return (
-                <button key={title} onClick={() => toggleHide(title)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer"
-                  style={{
-                    background: hidden ? 'rgba(239,68,68,.12)' : 'var(--surface)',
-                    color: hidden ? '#ef4444' : 'var(--text-2)',
-                    border: `1px solid ${hidden ? 'rgba(239,68,68,.3)' : 'var(--border)'}`,
-                    textDecoration: hidden ? 'line-through' : 'none',
-                  }}>
-                  {hidden ? '✕' : '●'} {title}
-                </button>
-              )
-            })}
-          </div>
-          {hiddenTitles.size > 0 && (
-            <button onClick={() => setHidden(new Set())} className="mt-3 text-xs hover:opacity-70 transition-all" style={{ color: 'var(--text-3)' }}>
-              Limpar filtros
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Filtros por pessoa */}
       <div className="flex flex-wrap gap-2 mb-5">
