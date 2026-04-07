@@ -24,9 +24,9 @@ interface CalendarEvent {
 }
 
 const OWNERS = [
-  { email: 'felipemarketingperformance@gmail.com', label: 'Felipe' },
-  { email: '01.nexoaceleradora@gmail.com',         label: '01.nexo' },
-  { email: 'danielvolpi83@gmail.com',              label: 'Daniel' },
+  { email: 'felipemarketingperformance@gmail.com', label: 'Felipe',  terms: ['felipe'] },
+  { email: '01.nexoaceleradora@gmail.com',         label: '01.nexo', terms: ['nexo', '01.nexo', 'vendas01', 'vendas 01'] },
+  { email: 'danielvolpi83@gmail.com',              label: 'Daniel',  terms: ['daniel', 'volpi'] },
 ]
 
 function fmtTime(iso: string) {
@@ -45,26 +45,27 @@ function fmtDateLabel(iso: string) {
 }
 
 function ownerOf(event: CalendarEvent): string | null {
-  const calId     = (event.calendarId    ?? '').toLowerCase()
-  const calName   = (event.calendarName  ?? '').toLowerCase()
+  const calId     = (event.calendarId     ?? '').toLowerCase()
+  const calName   = (event.calendarName   ?? '').toLowerCase()
   const organizer = (event.organizerEmail ?? '').toLowerCase()
 
+  // 1. calendarId é exatamente o email do dono
   const byCalId = OWNERS.find(o => calId === o.email.toLowerCase() || calId.includes(o.email.toLowerCase()))
   if (byCalId) return byCalId.email
 
+  // 2. nome do calendário contém um dos termos do dono (mais confiável que attendees)
+  const byCalName = OWNERS.find(o => o.terms.some(t => calName.includes(t)))
+  if (byCalName) return byCalName.email
+
+  // 3. organizador do evento é um dos donos
   const byOrganizer = OWNERS.find(o => organizer === o.email.toLowerCase())
   if (byOrganizer) return byOrganizer.email
 
+  // 4. attendee é um dos donos
   const byAttendee = OWNERS.find(o =>
     event.attendees.some(a => a.email.toLowerCase() === o.email.toLowerCase())
   )
-  if (byAttendee) return byAttendee.email
-
-  const byName = OWNERS.find(o =>
-    calName.includes(o.label.toLowerCase()) ||
-    calName.includes(o.email.split('@')[0].toLowerCase())
-  )
-  return byName?.email ?? null
+  return byAttendee?.email ?? null
 }
 
 function ownerLabel(event: CalendarEvent): string | null {
