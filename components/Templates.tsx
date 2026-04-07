@@ -462,16 +462,13 @@ export default function Templates() {
                     </div>
                   </div>
 
-                  {/* Image / Video URL */}
+                  {/* Image / Video upload */}
                   {(createType === 'image' || createType === 'video') && (
                     <div>
                       <label className="text-xs font-bold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--text-3)' }}>
-                        URL de exemplo ({createType === 'image' ? 'imagem' : 'vídeo'}) *
+                        {createType === 'image' ? 'Imagem de exemplo' : 'Vídeo de exemplo'} *
                       </label>
-                      <input value={form.headerMediaUrl} onChange={e => upd({ headerMediaUrl: e.target.value })}
-                        placeholder={createType === 'image' ? 'https://exemplo.com/imagem.jpg' : 'https://exemplo.com/video.mp4'}
-                        className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                        style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                      <FileUpload type={createType} value={form.headerMediaUrl} onChange={url => upd({ headerMediaUrl: url })} />
                       <p className="text-[10px] mt-1" style={{ color: 'var(--text-3)' }}>Usado como exemplo para aprovação da Meta</p>
                     </div>
                   )}
@@ -509,10 +506,9 @@ export default function Templates() {
                         </div>
                       )}
                       {(form.headerType === 'image' || form.headerType === 'video') && (
-                        <input value={form.headerMediaUrl} onChange={e => upd({ headerMediaUrl: e.target.value })}
-                          placeholder={form.headerType === 'image' ? 'https://exemplo.com/imagem.jpg' : 'https://exemplo.com/video.mp4'}
-                          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                        <div className="mt-3">
+                          <FileUpload type={form.headerType} value={form.headerMediaUrl} onChange={url => upd({ headerMediaUrl: url })} />
+                        </div>
                       )}
                     </div>
                   )}
@@ -621,6 +617,76 @@ export default function Templates() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function FileUpload({ type, value, onChange }: {
+  type: 'image' | 'video'
+  value: string
+  onChange: (url: string) => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError]         = useState('')
+  const accept  = type === 'image' ? '.jpg,.jpeg,.png' : '.mp4'
+  const formats = type === 'image' ? 'JPG, PNG' : 'MP4'
+  const maxMB   = type === 'image' ? '5MB' : '16MB'
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError(''); setUploading(true)
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('type', type)
+    try {
+      const res  = await fetch('/api/upload', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error); return }
+      onChange(data.url)
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  if (value) {
+    return (
+      <div className="rounded-xl p-3 flex items-center gap-3"
+        style={{ background: 'rgba(37,211,102,.08)', border: '1px solid rgba(37,211,102,.2)' }}>
+        {type === 'image'
+          ? <img src={value} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+          : <span className="text-2xl flex-shrink-0">🎥</span>
+        }
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold" style={{ color: '#25D366' }}>Upload concluído ✓</p>
+          <p className="text-[10px] truncate" style={{ color: 'var(--text-3)' }}>{value}</p>
+        </div>
+        <button onClick={() => onChange('')}
+          className="text-xs cursor-pointer hover:opacity-70 flex-shrink-0"
+          style={{ color: 'var(--text-3)' }}>✕</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <label className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all hover:opacity-80"
+        style={{ background: 'var(--surface2)', border: '2px dashed var(--border)' }}>
+        {uploading ? (
+          <><InlineSpin /><span className="text-xs" style={{ color: 'var(--text-3)' }}>Enviando...</span></>
+        ) : (
+          <>
+            <span className="text-3xl">{type === 'image' ? '🖼️' : '🎥'}</span>
+            <span className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>Clique para selecionar</span>
+            <span className="text-xs" style={{ color: 'var(--text-3)' }}>{formats} • máx. {maxMB}</span>
+          </>
+        )}
+        <input type="file" accept={accept} onChange={handleFile} className="hidden" disabled={uploading} />
+      </label>
+      {error && <p className="text-xs mt-1.5" style={{ color: '#ef4444' }}>{error}</p>}
     </div>
   )
 }
