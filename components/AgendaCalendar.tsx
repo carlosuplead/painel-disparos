@@ -20,6 +20,7 @@ interface CalendarEvent {
   calendarName: string | null
   calendarColor: string | null
   calendarId: string | null
+  organizerEmail: string | null
 }
 
 const OWNERS = [
@@ -44,15 +45,30 @@ function fmtDateLabel(iso: string) {
 }
 
 function ownerOf(event: CalendarEvent): string | null {
-  const calId   = (event.calendarId   ?? '').toLowerCase()
-  const calName = (event.calendarName ?? '').toLowerCase()
-  const match = OWNERS.find(o =>
-    calId === o.email.toLowerCase() ||
-    calId.includes(o.email.toLowerCase()) ||
+  const calId    = (event.calendarId    ?? '').toLowerCase()
+  const calName  = (event.calendarName  ?? '').toLowerCase()
+  const organizer = (event.organizerEmail ?? '').toLowerCase()
+
+  // 1. calendarId bate com email do dono
+  const byCalId = OWNERS.find(o => calId === o.email.toLowerCase() || calId.includes(o.email.toLowerCase()))
+  if (byCalId) return byCalId.email
+
+  // 2. organizador do evento é um dos 3 donos
+  const byOrganizer = OWNERS.find(o => organizer === o.email.toLowerCase())
+  if (byOrganizer) return byOrganizer.email
+
+  // 3. algum attendee é um dos 3 donos
+  const byAttendee = OWNERS.find(o =>
+    event.attendees.some(a => a.email.toLowerCase() === o.email.toLowerCase())
+  )
+  if (byAttendee) return byAttendee.email
+
+  // 4. nome do calendário contém o label ou prefixo do email
+  const byName = OWNERS.find(o =>
     calName.includes(o.label.toLowerCase()) ||
     calName.includes(o.email.split('@')[0].toLowerCase())
   )
-  return match?.email ?? null
+  return byName?.email ?? null
 }
 
 function ownerLabel(event: CalendarEvent): string | null {

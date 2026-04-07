@@ -111,17 +111,18 @@ export async function GET(request: NextRequest) {
         const videoLink = conferenceLink ?? urlMatch?.[0] ?? null
 
         return {
-          id:            `${cal.id}::${e.id}`,
-          title:         e.summary ?? '(sem título)',
-          start:         e.start?.dateTime ?? e.start?.date,
-          end:           e.end?.dateTime ?? e.end?.date,
-          description:   e.description ?? null,
-          attendees:     (e.attendees ?? []).map((a: any) => ({ email: a.email, name: a.displayName ?? null, self: a.self ?? false })),
-          location:      e.location ?? null,
-          link:          videoLink,
-          calendarName:  cal.summary,
-          calendarColor: cal.backgroundColor ?? '#4285F4',
-          calendarId:    cal.id,
+          id:             `${cal.id}::${e.id}`,
+          title:          e.summary ?? '(sem título)',
+          start:          e.start?.dateTime ?? e.start?.date,
+          end:            e.end?.dateTime ?? e.end?.date,
+          description:    e.description ?? null,
+          attendees:      (e.attendees ?? []).map((a: any) => ({ email: a.email, name: a.displayName ?? null, self: a.self ?? false })),
+          location:       e.location ?? null,
+          link:           videoLink,
+          calendarName:   cal.summary,
+          calendarColor:  cal.backgroundColor ?? '#4285F4',
+          calendarId:     cal.id,
+          organizerEmail: e.organizer?.email ?? null,
         }
       })
     })
