@@ -49,8 +49,7 @@ export async function GET(request: NextRequest) {
     supabase.rpc('count_disparados', { start_utc: startUTC, end_utc: endUTC }),
 
     // 2. RESPONDERAM
-    supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
-      .gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+    supabase.rpc('count_responderam', { start_utc: startUTC, end_utc: endUTC }),
 
     // 3. FINALIZADOS PELA IA
     supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
