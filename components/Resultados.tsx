@@ -2,6 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 
+interface AgendadoItem {
+  id: number
+  nome: string | null
+  email: string | null
+  telefone: string | null
+  data_definida: string | null
+  resumo: string | null
+  timestamp: string | null
+}
+
 interface ResultadosData {
   periodo:         { start: string; end: string }
   disparados:      number
@@ -11,6 +21,8 @@ interface ResultadosData {
   totalAgendados:  number
   taxaResposta:    string
   taxaAgendamento: string
+  listaAgendados:  AgendadoItem[]
+  followup:        { f0: number; f1: number; f2: number; f3plus: number }
 }
 
 type Preset = 'hoje' | 'ontem' | '7d' | '40d' | 'custom'
@@ -27,6 +39,17 @@ function fmtDate(iso: string) {
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
 }
+function fmtTimestamp(ts: string | null) {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+function getIdentifier(item: AgendadoItem): string {
+  if (item.nome  && item.nome.trim())  return item.nome.trim()
+  if (item.email && item.email.trim()) return item.email.trim()
+  if (item.telefone && item.telefone.trim()) return item.telefone.trim()
+  return 'Sem identificação'
+}
 
 /** Animated number hook */
 function useCountUp(target: number, duration = 600) {
@@ -39,7 +62,7 @@ function useCountUp(target: number, duration = 600) {
     const t0    = performance.now()
     const frame = (t: number) => {
       const p = Math.min((t - t0) / duration, 1)
-      setValue(Math.round(start + diff * (1 - Math.pow(1 - p, 3)))) // ease-out cubic
+      setValue(Math.round(start + diff * (1 - Math.pow(1 - p, 3))))
       if (p < 1) requestAnimationFrame(frame)
       else prev.current = target
     }
@@ -49,12 +72,13 @@ function useCountUp(target: number, duration = 600) {
 }
 
 export default function Resultados() {
-  const [preset, setPreset]         = useState<Preset>('hoje')
+  const [preset, setPreset]           = useState<Preset>('hoje')
   const [customStart, setCustomStart] = useState(todayBRL())
-  const [customEnd, setCustomEnd]   = useState(todayBRL())
-  const [data, setData]             = useState<ResultadosData | null>(null)
-  const [loading, setLoading]       = useState(false)
-  const [error, setError]           = useState('')
+  const [customEnd, setCustomEnd]     = useState(todayBRL())
+  const [data, setData]               = useState<ResultadosData | null>(null)
+  const [loading, setLoading]         = useState(false)
+  const [error, setError]             = useState('')
+  const [modalItem, setModalItem]     = useState<AgendadoItem | null>(null)
 
   const getRange = useCallback(() => {
     if (preset === 'hoje')  return { start: todayBRL(), end: todayBRL() }
@@ -97,15 +121,12 @@ export default function Resultados() {
       <div className="flex flex-wrap items-end gap-3 mb-8">
         <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)', background: 'var(--surface2)' }}>
           {presets.map(p => (
-            <button
-              key={p.id}
-              onClick={() => setPreset(p.id)}
+            <button key={p.id} onClick={() => setPreset(p.id)}
               className="px-4 py-2 text-sm font-medium transition-all cursor-pointer"
               style={{
                 background: preset === p.id ? '#25D366' : 'transparent',
                 color: preset === p.id ? '#000' : 'var(--text-2)',
-              }}
-            >
+              }}>
               {p.label}
             </button>
           ))}
@@ -157,35 +178,144 @@ export default function Resultados() {
 
           {/* Metric cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <MetricCard label="Disparados"   value={data.disparados}  sub={`${data.responderam > 0 ? data.taxaResposta + '% resp.' : '—'}`} color="#25D366" emoji="📤" />
-            <MetricCard label="Responderam"  value={data.responderam} sub={`${data.taxaResposta}% de engajamento`} color="#3b82f6" emoji="💬" />
-            <MetricCard label="Agendamentos" value={data.agendados}   sub={`${data.taxaAgendamento}% dos que responderam`} color="#a855f7" emoji="📅" />
-            <MetricCard label="Finalizados pela IA" value={data.pausados} sub="conversas encerradas pela IA" color="#f59e0b" emoji="🤖" />
+            <MetricCard label="Disparados"        value={data.disparados}  sub={`${data.responderam > 0 ? data.taxaResposta + '% resp.' : '—'}`} color="#25D366" emoji="📤" />
+            <MetricCard label="Responderam"        value={data.responderam} sub={`${data.taxaResposta}% de engajamento`}           color="#3b82f6" emoji="💬" />
+            <MetricCard label="Agendamentos"       value={data.agendados}   sub={`${data.taxaAgendamento}% dos que responderam`}    color="#a855f7" emoji="📅" />
+            <MetricCard label="Finalizados pela IA" value={data.pausados}   sub="conversas encerradas pela IA"                      color="#f59e0b" emoji="🤖" />
           </div>
 
           {/* Funnel */}
           <div className="gcard p-6 mb-5">
-            <p className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'var(--text-3)' }}>
-              Funil de Conversão
-            </p>
+            <p className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'var(--text-3)' }}>Funil de Conversão</p>
             <div className="space-y-4">
               <FunnelBar label="Disparados"   value={data.disparados}  max={data.disparados} color="#25D366" />
-              <FunnelBar label="Responderam"  value={data.responderam} max={data.disparados} color="#3b82f6"
-                badge={`${data.taxaResposta}%`} />
-              <FunnelBar label="Agendamentos" value={data.agendados}   max={data.disparados} color="#a855f7"
-                badge={`${data.taxaAgendamento}% dos que resp.`} />
+              <FunnelBar label="Responderam"  value={data.responderam} max={data.disparados} color="#3b82f6" badge={`${data.taxaResposta}%`} />
+              <FunnelBar label="Agendamentos" value={data.agendados}   max={data.disparados} color="#a855f7" badge={`${data.taxaAgendamento}% dos que resp.`} />
             </div>
           </div>
+
+          {/* Follow-up distribution */}
+          <div className="gcard p-6 mb-5">
+            <p className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'var(--text-3)' }}>Taxa de Follow-up</p>
+            <div className="space-y-3">
+              {[
+                { label: 'Sem follow-up (0)',  value: data.followup.f0,     color: '#6b7280' },
+                { label: '1 follow-up',         value: data.followup.f1,     color: '#3b82f6' },
+                { label: '2 follow-ups',        value: data.followup.f2,     color: '#f59e0b' },
+                { label: '3+ follow-ups',       value: data.followup.f3plus, color: '#ef4444' },
+              ].map(row => {
+                const total = data.followup.f0 + data.followup.f1 + data.followup.f2 + data.followup.f3plus
+                return (
+                  <FunnelBar key={row.label} label={row.label} value={row.value} max={total} color={row.color}
+                    badge={total > 0 ? `${((row.value / total) * 100).toFixed(0)}%` : '0%'} />
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Lista de agendados */}
+          {data.listaAgendados.length > 0 && (
+            <div className="gcard p-6 mb-5">
+              <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--text-3)' }}>
+                Agendados no período ({data.listaAgendados.length})
+              </p>
+              <div className="space-y-2">
+                {data.listaAgendados.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setModalItem(item)}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all hover:opacity-80 cursor-pointer"
+                    style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+                        style={{ background: 'rgba(168,85,247,.15)', color: '#a855f7' }}>
+                        {getIdentifier(item).charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
+                          {getIdentifier(item)}
+                        </p>
+                        {item.telefone && (
+                          <p className="text-xs truncate" style={{ color: 'var(--text-3)' }}>{item.telefone}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-3">
+                      {item.data_definida && (
+                        <p className="text-xs font-semibold" style={{ color: '#a855f7' }}>{item.data_definida}</p>
+                      )}
+                      <p className="text-xs" style={{ color: 'var(--text-3)' }}>{fmtTimestamp(item.timestamp)}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Total histórico */}
           <div className="gcard p-5 flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-3)' }}>Total histórico de agendamentos</p>
-              <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>
-                {data.totalAgendados.toLocaleString('pt-BR')}
-              </p>
+              <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{data.totalAgendados.toLocaleString('pt-BR')}</p>
             </div>
             <span className="text-4xl opacity-20">📊</span>
+          </div>
+        </div>
+      )}
+
+      {/* Modal */}
+      {modalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setModalItem(null)}>
+          <div className="w-full max-w-lg rounded-2xl p-6 relative max-h-[80vh] overflow-y-auto"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold"
+                  style={{ background: 'rgba(168,85,247,.15)', color: '#a855f7' }}>
+                  {getIdentifier(modalItem).charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{getIdentifier(modalItem)}</p>
+                  {modalItem.email && <p className="text-xs" style={{ color: 'var(--text-3)' }}>{modalItem.email}</p>}
+                </div>
+              </div>
+              <button onClick={() => setModalItem(null)} className="text-lg cursor-pointer hover:opacity-60" style={{ color: 'var(--text-3)' }}>✕</button>
+            </div>
+
+            {/* Info grid */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {modalItem.telefone && (
+                <div className="rounded-xl p-3" style={{ background: 'var(--surface2)' }}>
+                  <p className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>Telefone</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{modalItem.telefone}</p>
+                </div>
+              )}
+              {modalItem.data_definida && (
+                <div className="rounded-xl p-3" style={{ background: 'var(--surface2)' }}>
+                  <p className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>Data agendada</p>
+                  <p className="text-sm font-semibold" style={{ color: '#a855f7' }}>{modalItem.data_definida}</p>
+                </div>
+              )}
+              {modalItem.timestamp && (
+                <div className="rounded-xl p-3 col-span-2" style={{ background: 'var(--surface2)' }}>
+                  <p className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>Agendado em</p>
+                  <p className="text-sm" style={{ color: 'var(--text)' }}>{fmtTimestamp(modalItem.timestamp)}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Resumo */}
+            {modalItem.resumo && (
+              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Resumo</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{modalItem.resumo}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -201,7 +331,6 @@ function MetricCard({ label, value, sub, color, emoji }: {
   const displayed = useCountUp(value)
   return (
     <div className="gcard p-5 relative overflow-hidden">
-      {/* Accent glow */}
       <div className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-10 blur-2xl"
         style={{ background: color, transform: 'translate(25%, -25%)' }} />
       <div className="text-2xl mb-3">{emoji}</div>
@@ -226,10 +355,7 @@ function FunnelBar({ label, value, max, color, badge }: {
         </div>
       </div>
       <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: color }}
-        />
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>
   )

@@ -5,8 +5,6 @@ import { cookies } from 'next/headers'
 // Brazil UTC-3: BRL midnight = UTC 03:00
 function toBRLDate(dateStr: string, endOfDay = false): string {
   const d = new Date(dateStr)
-  // start: BRL 00:00 = UTC 03:00 same day
-  // end:   BRL 23:59 = UTC 02:59+1 = UTC 03:00 next day => hour 27
   d.setUTCHours(endOfDay ? 27 : 3, 0, 0, 0)
   return d.toISOString()
 }
@@ -25,7 +23,6 @@ async function createClient() {
   )
 }
 
-
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const startDate = searchParams.get('start') ?? new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
@@ -36,43 +33,58 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
 
-  // ── 1. DISPARADOS: sessões distintas com msg 'ai' no período ──
-  const { data: dispData, error: dispError } = await supabase.rpc('count_disparados', {
-    start_utc: startUTC,
-    end_utc: endUTC,
-  })
+  const [
+    { data: dispData },
+    { count: respCount },
+    { count: pausados },
+    { count: agendados },
+    { count: totalAgendados },
+    { data: listaAgendados },
+    { count: fup0 },
+    { count: fup1 },
+    { count: fup2 },
+    { count: fup3plus },
+  ] = await Promise.all([
+    // 1. DISPARADOS
+    supabase.rpc('count_disparados', { start_utc: startUTC, end_utc: endUTC }),
+
+    // 2. RESPONDERAM
+    supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
+      .gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+
+    // 3. FINALIZADOS PELA IA
+    supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
+      .eq('pausado', 'true').gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+
+    // 4. AGENDADOS count
+    supabase.from('Voomp-Agendamentos-Otto').select('*', { count: 'exact', head: true })
+      .eq('recebeu-disparo', 'SIM_RECEBEU').gte('timestamp', startUTC).lt('timestamp', endUTC),
+
+    // 5. TOTAL HISTÓRICO
+    supabase.from('Voomp-Agendamentos-Otto').select('*', { count: 'exact', head: true })
+      .eq('recebeu-disparo', 'SIM_RECEBEU'),
+
+    // 6. LISTA AGENDADOS com dados
+    supabase.from('Voomp-Agendamentos-Otto')
+      .select('id, nome, email, telefone, data_definida, resumo, timestamp')
+      .eq('recebeu-disparo', 'SIM_RECEBEU')
+      .gte('timestamp', startUTC).lt('timestamp', endUTC)
+      .order('timestamp', { ascending: false })
+      .limit(100),
+
+    // 7. FOLLOWUP DISTRIBUTION
+    supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
+      .eq('followup_count', 0).gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+    supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
+      .eq('followup_count', 1).gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+    supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
+      .eq('followup_count', 2).gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+    supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
+      .gte('followup_count', 3).gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+  ])
+
   const disparados: number = dispData ?? 0
-
-  // ── 2. RESPONDERAM: leads na IA-VOOMP com Timestamp no período ──
-  // Timestamp é atualizado sempre que o lead responde → conta quem interagiu no período
-  const { count: respCount, error: respError } = await supabase
-    .from('IA-VOOMP')
-    .select('*', { count: 'exact', head: true })
-    .gte('Timestamp', startDate)
-    .lte('Timestamp', endDate + 'T23:59:59')
   const responderam: number = respCount ?? 0
-
-  // ── 3. FINALIZADOS PELA IA: pausado = 'true', filtrado por Timestamp (texto ISO) no período BRL ──
-  const { count: pausados } = await supabase
-    .from('IA-VOOMP')
-    .select('*', { count: 'exact', head: true })
-    .eq('pausado', 'true')
-    .gte('Timestamp', startDate)
-    .lte('Timestamp', endDate + 'T23:59:59')
-
-  // ── 4. AGENDADOS no período ──
-  const { count: agendados } = await supabase
-    .from('Voomp-Agendamentos-Otto')
-    .select('*', { count: 'exact', head: true })
-    .eq('recebeu-disparo', 'SIM_RECEBEU')
-    .gte('timestamp', startUTC)
-    .lt('timestamp', endUTC)
-
-  // ── 5. TOTAL AGENDAMENTOS histórico ──
-  const { count: totalAgendados } = await supabase
-    .from('Voomp-Agendamentos-Otto')
-    .select('*', { count: 'exact', head: true })
-    .eq('recebeu-disparo', 'SIM_RECEBEU')
 
   const taxaResposta    = disparados > 0 ? ((responderam / disparados) * 100).toFixed(1) : '0'
   const taxaAgendamento = responderam > 0 ? (((agendados ?? 0) / responderam) * 100).toFixed(1) : '0'
@@ -81,10 +93,17 @@ export async function GET(request: NextRequest) {
     periodo: { start: startDate, end: endDate },
     disparados,
     responderam,
-    pausados:       pausados ?? 0,
-    agendados:      agendados ?? 0,
-    totalAgendados: totalAgendados ?? 0,
+    pausados:        pausados ?? 0,
+    agendados:       agendados ?? 0,
+    totalAgendados:  totalAgendados ?? 0,
     taxaResposta,
     taxaAgendamento,
+    listaAgendados:  listaAgendados ?? [],
+    followup: {
+      f0: fup0 ?? 0,
+      f1: fup1 ?? 0,
+      f2: fup2 ?? 0,
+      f3plus: fup3plus ?? 0,
+    },
   })
 }
