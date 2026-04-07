@@ -125,9 +125,13 @@ export default function AgendaCalendar() {
     )
   }
 
-  // "Agenda fixa" = sem participantes externos E sem link de reunião
-  const isFixed = (e: CalendarEvent) =>
-    e.attendees.filter(a => !a.self).length === 0 && !e.link
+  // Títulos que sempre são agendas fixas, independente de link ou attendees
+  const FIXED_TITLES = ['agenda travada', 'travada', 'reunião fixa', 'reuniao fixa', 'bloqueado', 'bloqueada']
+  const isFixed = (e: CalendarEvent) => {
+    const titleLower = e.title.toLowerCase()
+    if (FIXED_TITLES.some(t => titleLower.includes(t))) return true
+    return e.attendees.filter(a => !a.self).length === 0 && !e.link
+  }
 
   const visibleEvents = hideFixed ? events.filter(e => !isFixed(e)) : events
 
