@@ -312,8 +312,8 @@ export default function Resultados() {
             {/* Resumo */}
             {modalItem.resumo && (
               <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Resumo</p>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{modalItem.resumo}</p>
+                <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-3)' }}>Resumo</p>
+                <ResumoFormatado text={modalItem.resumo} />
               </div>
             )}
           </div>
@@ -357,6 +357,44 @@ function FunnelBar({ label, value, max, color, badge }: {
       <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
       </div>
+    </div>
+  )
+}
+
+function ResumoFormatado({ text }: { text: string }) {
+  // Separa por 2+ espaços ou por \n
+  const sections = text.split(/\s{2,}|\n/).map(s => s.trim()).filter(Boolean)
+
+  return (
+    <div className="space-y-2">
+      {sections.map((section, i) => {
+        // Cabeçalho com 🟢
+        if (section.startsWith('🟢')) {
+          return (
+            <p key={i} className="text-xs font-semibold text-center pb-1" style={{ color: '#25D366', borderBottom: '1px solid var(--border)' }}>
+              {section}
+            </p>
+          )
+        }
+        // Seção com "—" → lista
+        if (section.includes(' — ')) {
+          const parts = section.split(' — ').filter(Boolean)
+          return (
+            <div key={i} className="space-y-1">
+              <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{parts[0]}</p>
+              {parts.slice(1).map((p, j) => (
+                <p key={j} className="text-xs pl-3 py-0.5" style={{ color: 'var(--text-2)', borderLeft: '2px solid rgba(168,85,247,.4)' }}>
+                  {p}
+                </p>
+              ))}
+            </div>
+          )
+        }
+        // Linha normal
+        return (
+          <p key={i} className="text-sm" style={{ color: 'var(--text)' }}>{section}</p>
+        )
+      })}
     </div>
   )
 }
