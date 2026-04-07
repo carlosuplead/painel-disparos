@@ -84,9 +84,10 @@ export async function GET(request: NextRequest) {
   const params = new URLSearchParams({
     timeMin,
     timeMax,
-    singleEvents: 'true',
-    orderBy:      'startTime',
-    maxResults:   '50',
+    singleEvents:  'true',
+    orderBy:       'startTime',
+    maxResults:    '100',
+    maxAttendees:  '100',
   })
 
   const results = await Promise.all(
@@ -136,8 +137,17 @@ export async function GET(request: NextRequest) {
     })
   )
 
-  // Mescla e ordena por horário de início
-  const events = results.flat().sort((a, b) => {
+  // Deduplica por ID base (mesmo evento em múltiplos calendários), mantém o com mais attendees
+  const byBaseId = new Map<string, typeof results[0][0]>()
+  for (const ev of results.flat()) {
+    const baseId = ev.id.split('::')[1] ?? ev.id
+    const existing = byBaseId.get(baseId)
+    if (!existing || ev.attendees.length > existing.attendees.length) {
+      byBaseId.set(baseId, ev)
+    }
+  }
+
+  const events = Array.from(byBaseId.values()).sort((a, b) => {
     if (!a.start) return 1
     if (!b.start) return -1
     return a.start.localeCompare(b.start)
