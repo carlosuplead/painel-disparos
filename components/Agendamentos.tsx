@@ -70,7 +70,7 @@ export default function Agendamentos({ templates }: { templates: Tmpl[] }) {
           template: fTemplate,
           linguagem: t?.language ?? 'pt_BR',
           quantidade: fQtd,
-          scheduled_at: fDatetime, // BRL local time, sem conversão UTC
+          scheduled_at: fDatetime.replace('T', ' ') + ':00', // "2026-04-06 21:55:00" — BRL puro
         }),
       })
       if (res.ok) {

@@ -27,8 +27,9 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
 
-  // Horário atual em BRL (coluna scheduled_at é TIMESTAMP sem fuso, salvo em BRL)
-  const nowBRL = new Date().toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).replace(' ', 'T')
+  // Horário BRL = UTC - 3h (sem depender de locale do servidor)
+  const brlNow = new Date(Date.now() - 3 * 60 * 60 * 1000)
+  const nowBRL = brlNow.toISOString().slice(0, 19).replace('T', ' ') // "2026-04-06 21:58:47"
 
   // ── ATOMIC CLAIM: muda status para 'processando' antes de disparar ──
   // Garante que mesmo se dois crons rodarem ao mesmo tempo,
