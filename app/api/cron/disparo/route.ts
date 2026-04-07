@@ -16,6 +16,9 @@ async function createClient() {
   )
 }
 
+// Supabase cron uses POST (net.http_post), Vercel cron uses GET — handle both
+export async function POST(request: NextRequest) { return GET(request) }
+
 export async function GET(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret') ?? new URL(request.url).searchParams.get('secret')
   if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
