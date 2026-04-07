@@ -88,11 +88,10 @@ export default function Dashboard({ userEmail }: { userEmail: string }) {
 
       {/* ── Sidebar ── */}
       <aside
-        className="fixed top-0 left-0 bottom-0 z-30 w-56 flex flex-col transition-transform duration-200 lg:translate-x-0"
+        className={`fixed top-0 left-0 bottom-0 z-30 w-56 flex flex-col transition-transform duration-200 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
         style={{
           background: 'var(--surface)',
           borderRight: '1px solid var(--border)',
-          transform: sidebarOpen ? 'translateX(0)' : undefined,
         }}
       >
         {/* Logo */}
