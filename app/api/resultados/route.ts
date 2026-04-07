@@ -81,11 +81,13 @@ export async function GET(request: NextRequest) {
   })
   const responderam: number = respData ?? 0
 
-  // ── 3. FINALIZADOS PELA IA: pausado = 'true' (texto), exclui 'aguardando' e false ──
+  // ── 3. FINALIZADOS PELA IA: pausado = 'true', filtrado por Timestamp (texto ISO) no período BRL ──
   const { count: pausados } = await supabase
     .from('IA-VOOMP')
     .select('*', { count: 'exact', head: true })
     .eq('pausado', 'true')
+    .gte('Timestamp', startDate)
+    .lte('Timestamp', endDate + 'T23:59:59')
 
   // ── 4. AGENDADOS no período ──
   const { count: agendados } = await supabase
