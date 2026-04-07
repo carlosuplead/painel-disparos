@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface Attendee {
   email: string
@@ -45,25 +45,21 @@ function fmtDateLabel(iso: string) {
 }
 
 function ownerOf(event: CalendarEvent): string | null {
-  const calId    = (event.calendarId    ?? '').toLowerCase()
-  const calName  = (event.calendarName  ?? '').toLowerCase()
+  const calId     = (event.calendarId    ?? '').toLowerCase()
+  const calName   = (event.calendarName  ?? '').toLowerCase()
   const organizer = (event.organizerEmail ?? '').toLowerCase()
 
-  // 1. calendarId bate com email do dono
   const byCalId = OWNERS.find(o => calId === o.email.toLowerCase() || calId.includes(o.email.toLowerCase()))
   if (byCalId) return byCalId.email
 
-  // 2. organizador do evento é um dos 3 donos
   const byOrganizer = OWNERS.find(o => organizer === o.email.toLowerCase())
   if (byOrganizer) return byOrganizer.email
 
-  // 3. algum attendee é um dos 3 donos
   const byAttendee = OWNERS.find(o =>
     event.attendees.some(a => a.email.toLowerCase() === o.email.toLowerCase())
   )
   if (byAttendee) return byAttendee.email
 
-  // 4. nome do calendário contém o label ou prefixo do email
   const byName = OWNERS.find(o =>
     calName.includes(o.label.toLowerCase()) ||
     calName.includes(o.email.split('@')[0].toLowerCase())
@@ -77,12 +73,14 @@ function ownerLabel(event: CalendarEvent): string | null {
 }
 
 export default function AgendaCalendar() {
-  const [date, setDate]         = useState(todayBRL())
-  const [events, setEvents]     = useState<CalendarEvent[]>([])
-  const [connected, setConn]    = useState<boolean | null>(null)
-  const [loading, setLoading]   = useState(false)
-  const [selected, setSelected] = useState<CalendarEvent | null>(null)
-  const [filter, setFilter]     = useState<string>('all')
+  const [date, setDate]           = useState(todayBRL())
+  const [events, setEvents]       = useState<CalendarEvent[]>([])
+  const [connected, setConn]      = useState<boolean | null>(null)
+  const [loading, setLoading]     = useState(false)
+  const [selected, setSelected]   = useState<CalendarEvent | null>(null)
+  const [filter, setFilter]       = useState<string>('all')
+  const [hiddenTitles, setHidden] = useState<Set<string>>(new Set())
+  const [showHidePanel, setShowHidePanel] = useState(false)
 
   async function fetchEvents(d: string) {
     setLoading(true)
@@ -123,18 +121,31 @@ export default function AgendaCalendar() {
     )
   }
 
-  // Contagem por owner
+  // Títulos únicos para o painel de ocultar
+  const uniqueTitles = Array.from(new Set(events.map(e => e.title))).sort()
+
+  function toggleHide(title: string) {
+    setHidden(prev => {
+      const next = new Set(prev)
+      next.has(title) ? next.delete(title) : next.add(title)
+      return next
+    })
+  }
+
+  // Contagem por owner (antes de ocultar títulos)
   const countByOwner = OWNERS.reduce<Record<string, number>>((acc, o) => {
-    acc[o.email] = events.filter(e => ownerOf(e) === o.email).length
+    acc[o.email] = events.filter(e => ownerOf(e) === o.email && !hiddenTitles.has(e.title)).length
     return acc
   }, {})
-  const countOther = events.filter(e => ownerOf(e) === null).length
+  const countOther = events.filter(e => ownerOf(e) === null && !hiddenTitles.has(e.title)).length
 
-  const filtered = filter === 'all'
-    ? events
-    : filter === 'other'
-    ? events.filter(e => ownerOf(e) === null)
-    : events.filter(e => ownerOf(e) === filter)
+  const filtered = events
+    .filter(e => !hiddenTitles.has(e.title))
+    .filter(e =>
+      filter === 'all'   ? true :
+      filter === 'other' ? ownerOf(e) === null :
+      ownerOf(e) === filter
+    )
 
   return (
     <div>
@@ -154,14 +165,51 @@ export default function AgendaCalendar() {
             {loading ? <InlineSpin /> : '↻'}
           </button>
         </div>
-        <a href="/api/auth/google" className="text-xs hover:opacity-70 transition-all" style={{ color: 'var(--text-3)' }}>
-          Reconectar Google ↗
-        </a>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowHidePanel(v => !v)}
+            className="text-xs px-3 py-2 rounded-lg transition-all cursor-pointer hover:opacity-80 flex items-center gap-1.5"
+            style={{ background: showHidePanel ? 'rgba(239,68,68,.1)' : 'var(--surface2)', border: `1px solid ${showHidePanel ? 'rgba(239,68,68,.3)' : 'var(--border)'}`, color: showHidePanel ? '#ef4444' : 'var(--text-2)' }}>
+            {showHidePanel ? '✕ Fechar' : '⚙ Ocultar eventos'}
+            {hiddenTitles.size > 0 && <span className="rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold" style={{ background: '#ef4444', color: '#fff' }}>{hiddenTitles.size}</span>}
+          </button>
+          <a href="/api/auth/google" className="text-xs hover:opacity-70 transition-all" style={{ color: 'var(--text-3)' }}>
+            Reconectar ↗
+          </a>
+        </div>
       </div>
 
-      {/* Filtros por pessoa + contadores */}
+      {/* Painel de ocultar títulos */}
+      {showHidePanel && (
+        <div className="rounded-xl p-4 mb-5" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+          <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-3)' }}>Selecione os eventos para ocultar</p>
+          <div className="flex flex-wrap gap-2">
+            {uniqueTitles.map(title => {
+              const hidden = hiddenTitles.has(title)
+              return (
+                <button key={title} onClick={() => toggleHide(title)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer"
+                  style={{
+                    background: hidden ? 'rgba(239,68,68,.12)' : 'var(--surface)',
+                    color: hidden ? '#ef4444' : 'var(--text-2)',
+                    border: `1px solid ${hidden ? 'rgba(239,68,68,.3)' : 'var(--border)'}`,
+                    textDecoration: hidden ? 'line-through' : 'none',
+                  }}>
+                  {hidden ? '✕' : '●'} {title}
+                </button>
+              )
+            })}
+          </div>
+          {hiddenTitles.size > 0 && (
+            <button onClick={() => setHidden(new Set())} className="mt-3 text-xs hover:opacity-70 transition-all" style={{ color: 'var(--text-3)' }}>
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Filtros por pessoa */}
       <div className="flex flex-wrap gap-2 mb-5">
-        <FilterBtn label="Todos" count={events.length} active={filter === 'all'} onClick={() => setFilter('all')} color="#4285F4" />
+        <FilterBtn label="Todos" count={filtered.length} active={filter === 'all'} onClick={() => setFilter('all')} color="#4285F4" />
         {OWNERS.map(o => (
           <FilterBtn key={o.email} label={o.label} count={countByOwner[o.email] ?? 0} active={filter === o.email} onClick={() => setFilter(o.email)} color="#25D366" />
         ))}
@@ -183,16 +231,13 @@ export default function AgendaCalendar() {
         {filtered.map(event => (
           <button key={event.id} onClick={() => setSelected(event)}
             className="w-full gcard p-4 flex items-start gap-4 text-left hover:opacity-80 transition-all cursor-pointer">
-            {/* Horário */}
             <div className="flex-shrink-0 text-right min-w-[52px]">
               <p className="text-sm font-bold" style={{ color: event.calendarColor ?? '#4285F4' }}>{fmtTime(event.start)}</p>
               <p className="text-xs" style={{ color: 'var(--text-3)' }}>{fmtTime(event.end)}</p>
             </div>
 
-            {/* Barra colorida */}
             <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: event.calendarColor ?? '#4285F4', opacity: 0.8 }} />
 
-            {/* Conteúdo */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{event.title}</p>
               {event.attendees.length > 0 && (
@@ -216,7 +261,6 @@ export default function AgendaCalendar() {
               </div>
             </div>
 
-            {/* Meet / Video link */}
             {event.link && (
               <a href={event.link} target="_blank" rel="noreferrer"
                 onClick={e => e.stopPropagation()}
@@ -229,16 +273,18 @@ export default function AgendaCalendar() {
         ))}
       </div>
 
-      {/* Modal */}
+      {/* Modal — header fixo, scroll apenas no body */}
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.6)' }}
           onClick={() => setSelected(null)}>
-          <div className="w-full max-w-lg rounded-2xl p-6 max-h-[80vh] overflow-y-auto"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+          <div className="w-full max-w-lg rounded-2xl flex flex-col"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', maxHeight: '80vh' }}
             onClick={e => e.stopPropagation()}>
 
-            <div className="flex items-start justify-between mb-5">
+            {/* Header fixo */}
+            <div className="flex items-start justify-between p-5 flex-shrink-0"
+              style={{ borderBottom: '1px solid var(--border)' }}>
               <div className="flex-1 min-w-0 pr-3">
                 <p className="font-bold text-base" style={{ color: 'var(--text)' }}>{selected.title}</p>
                 <p className="text-sm mt-0.5" style={{ color: selected.calendarColor ?? '#4285F4' }}>
@@ -248,50 +294,55 @@ export default function AgendaCalendar() {
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>● {selected.calendarName}</p>
                 )}
               </div>
-              <button onClick={() => setSelected(null)} className="text-lg cursor-pointer hover:opacity-60" style={{ color: 'var(--text-3)' }}>✕</button>
+              <button onClick={() => setSelected(null)}
+                className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-sm cursor-pointer hover:opacity-60 transition-all"
+                style={{ background: 'var(--surface2)', color: 'var(--text-2)' }}>✕</button>
             </div>
 
-            {selected.attendees.length > 0 && (
-              <div className="rounded-xl p-4 mb-3" style={{ background: 'var(--surface2)' }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Participantes</p>
-                <div className="space-y-1.5">
-                  {selected.attendees.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                        style={{ background: 'rgba(66,133,244,.15)', color: '#4285F4' }}>
-                        {(a.name ?? a.email).charAt(0).toUpperCase()}
+            {/* Body com scroll */}
+            <div className="overflow-y-auto p-5 space-y-3">
+              {selected.link && (
+                <a href={selected.link} target="_blank" rel="noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold hover:opacity-80 transition-all"
+                  style={{ background: '#4285F4', color: '#fff' }}>
+                  Entrar na reunião ↗
+                </a>
+              )}
+
+              {selected.attendees.length > 0 && (
+                <div className="rounded-xl p-4" style={{ background: 'var(--surface2)' }}>
+                  <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Participantes</p>
+                  <div className="space-y-1.5">
+                    {selected.attendees.map((a, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                          style={{ background: 'rgba(66,133,244,.15)', color: '#4285F4' }}>
+                          {(a.name ?? a.email).charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          {a.name && <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{a.name} {a.self ? '(você)' : ''}</p>}
+                          <p className="text-xs truncate" style={{ color: 'var(--text-3)' }}>{a.email}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        {a.name && <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{a.name} {a.self ? '(você)' : ''}</p>}
-                        <p className="text-xs truncate" style={{ color: 'var(--text-3)' }}>{a.email}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {selected.location && (
-              <div className="rounded-xl p-3 mb-3 flex items-center gap-2" style={{ background: 'var(--surface2)' }}>
-                <span>📍</span>
-                <p className="text-sm" style={{ color: 'var(--text)' }}>{selected.location}</p>
-              </div>
-            )}
+              {selected.location && (
+                <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: 'var(--surface2)' }}>
+                  <span>📍</span>
+                  <p className="text-sm" style={{ color: 'var(--text)' }}>{selected.location}</p>
+                </div>
+              )}
 
-            {selected.link && (
-              <a href={selected.link} target="_blank" rel="noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold mb-3 hover:opacity-80 transition-all"
-                style={{ background: '#4285F4', color: '#fff' }}>
-                Entrar na reunião ↗
-              </a>
-            )}
-
-            {selected.description && (
-              <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Descrição</p>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{selected.description}</p>
-              </div>
-            )}
+              {selected.description && (
+                <div className="rounded-xl p-4" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Descrição</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{selected.description}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
