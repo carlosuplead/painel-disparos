@@ -17,6 +17,8 @@ interface CalendarEvent {
   attendees: Attendee[]
   location: string | null
   link: string | null
+  calendarName: string | null
+  calendarColor: string | null
 }
 
 function fmtTime(iso: string) {
@@ -125,7 +127,7 @@ export default function AgendaCalendar() {
             </div>
 
             {/* Barra colorida */}
-            <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: '#4285F4', opacity: 0.6 }} />
+            <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: event.calendarColor ?? '#4285F4', opacity: 0.8 }} />
 
             {/* Conteúdo */}
             <div className="flex-1 min-w-0">
@@ -137,6 +139,9 @@ export default function AgendaCalendar() {
               )}
               {event.location && (
                 <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-3)' }}>📍 {event.location}</p>
+              )}
+              {event.calendarName && (
+                <p className="text-xs mt-0.5 truncate" style={{ color: event.calendarColor ?? '#4285F4', opacity: 0.8 }}>● {event.calendarName}</p>
               )}
             </div>
 

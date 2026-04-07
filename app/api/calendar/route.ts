@@ -66,6 +66,21 @@ export async function GET(request: NextRequest) {
   const timeMin = `${date}T00:00:00-03:00`
   const timeMax = `${date}T23:59:59-03:00`
 
+  // Busca todos os calendários do usuário
+  const calListRes = await fetch(
+    'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=50',
+    { headers: { Authorization: `Bearer ${token}` } }
+  )
+
+  if (!calListRes.ok) {
+    return NextResponse.json({ connected: false, events: [] })
+  }
+
+  const calListData = await calListRes.json()
+  const calendars: { id: string; summary: string; backgroundColor: string }[] =
+    (calListData.items ?? []).filter((c: any) => c.selected !== false)
+
+  // Busca eventos de todos os calendários em paralelo
   const params = new URLSearchParams({
     timeMin,
     timeMax,
@@ -74,27 +89,35 @@ export async function GET(request: NextRequest) {
     maxResults:   '50',
   })
 
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
-    { headers: { Authorization: `Bearer ${token}` } }
+  const results = await Promise.all(
+    calendars.map(async (cal) => {
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events?${params}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!res.ok) return []
+      const data = await res.json()
+      return (data.items ?? []).map((e: any) => ({
+        id:           `${cal.id}::${e.id}`,
+        title:        e.summary ?? '(sem título)',
+        start:        e.start?.dateTime ?? e.start?.date,
+        end:          e.end?.dateTime ?? e.end?.date,
+        description:  e.description ?? null,
+        attendees:    (e.attendees ?? []).map((a: any) => ({ email: a.email, name: a.displayName ?? null, self: a.self ?? false })),
+        location:     e.location ?? null,
+        link:         e.hangoutLink ?? null,
+        calendarName: cal.summary,
+        calendarColor: cal.backgroundColor ?? '#4285F4',
+      }))
+    })
   )
 
-  if (!res.ok) {
-    return NextResponse.json({ connected: false, events: [] })
-  }
-
-  const data = await res.json()
-
-  const events = (data.items ?? []).map((e: any) => ({
-    id:          e.id,
-    title:       e.summary ?? '(sem título)',
-    start:       e.start?.dateTime ?? e.start?.date,
-    end:         e.end?.dateTime ?? e.end?.date,
-    description: e.description ?? null,
-    attendees:   (e.attendees ?? []).map((a: any) => ({ email: a.email, name: a.displayName ?? null, self: a.self ?? false })),
-    location:    e.location ?? null,
-    link:        e.hangoutLink ?? null,
-  }))
+  // Mescla e ordena por horário de início
+  const events = results.flat().sort((a, b) => {
+    if (!a.start) return 1
+    if (!b.start) return -1
+    return a.start.localeCompare(b.start)
+  })
 
   return NextResponse.json({ connected: true, events })
 }
