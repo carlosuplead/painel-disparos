@@ -92,7 +92,9 @@ export default function Agendamentos({ templates }: { templates: Tmpl[] }) {
     setList(l => l.filter(x => x.id !== id))
   }
 
-  const minDatetime = new Date(Date.now() + 60000).toISOString().slice(0, 16)
+  // Permite selecionar hoje — só bloqueia datas passadas no nível do dia
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+  const minDatetime = `${today}T00:00`
 
   return (
     <div>
