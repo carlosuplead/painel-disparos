@@ -121,8 +121,9 @@ export default function AgendaCalendar() {
     )
   }
 
-  // "Agenda fixa" = evento sem participantes externos
-  const isFixed = (e: CalendarEvent) => e.attendees.filter(a => !a.self).length === 0
+  // "Agenda fixa" = sem participantes externos E sem link de reunião
+  const isFixed = (e: CalendarEvent) =>
+    e.attendees.filter(a => !a.self).length === 0 && !e.link
 
   const visibleEvents = hideFixed ? events.filter(e => !isFixed(e)) : events
 
