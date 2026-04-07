@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     // 3. FINALIZADOS PELA IA
     supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
-      .eq('pausado', 'true').gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+      .eq('pausado', 'true').gte('Timestamp', startUTC).lt('Timestamp', endUTC),
 
     // 4. AGENDADOS count
     supabase.from('Voomp-Agendamentos-Otto').select('*', { count: 'exact', head: true })
@@ -73,13 +73,13 @@ export async function GET(request: NextRequest) {
 
     // 7. FOLLOWUP DISTRIBUTION
     supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
-      .eq('followup_count', 0).gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+      .eq('followup_count', 0).gte('Timestamp', startUTC).lt('Timestamp', endUTC),
     supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
-      .eq('followup_count', 1).gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+      .eq('followup_count', 1).gte('Timestamp', startUTC).lt('Timestamp', endUTC),
     supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
-      .eq('followup_count', 2).gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+      .eq('followup_count', 2).gte('Timestamp', startUTC).lt('Timestamp', endUTC),
     supabase.from('IA-VOOMP').select('*', { count: 'exact', head: true })
-      .gte('followup_count', 3).gte('Timestamp', startDate).lte('Timestamp', endDate + 'T23:59:59'),
+      .gte('followup_count', 3).gte('Timestamp', startUTC).lt('Timestamp', endUTC),
   ])
 
   const disparados: number = dispData ?? 0

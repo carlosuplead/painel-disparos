@@ -45,15 +45,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${base}/?google=error`)
   }
 
-  // Salva no Supabase
+  // Salva no Supabase (não sobrescreve refresh_token se Google não devolveu um novo)
   const supabase = await createClient()
-  await supabase.from('google_tokens').upsert({
-    id:            1,
-    access_token:  tokens.access_token,
-    refresh_token: tokens.refresh_token ?? null,
-    expires_at:    Date.now() + (tokens.expires_in ?? 3600) * 1000,
-    updated_at:    new Date().toISOString(),
-  })
+  const upsertData: Record<string, unknown> = {
+    id:           1,
+    access_token: tokens.access_token,
+    expires_at:   Date.now() + (tokens.expires_in ?? 3600) * 1000,
+    updated_at:   new Date().toISOString(),
+  }
+  if (tokens.refresh_token) {
+    upsertData.refresh_token = tokens.refresh_token
+  }
+  await supabase.from('google_tokens').upsert(upsertData)
 
   return NextResponse.redirect(`${base}/?google=connected`)
 }
