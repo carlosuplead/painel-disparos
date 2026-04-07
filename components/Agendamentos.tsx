@@ -101,19 +101,10 @@ export default function Agendamentos({ templates }: { templates: Tmpl[] }) {
         <div>
           <h2 className="font-semibold" style={{ color: 'var(--text)' }}>Disparos Agendados</h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
-            Configure um cron em{' '}
-            <a href="https://cron-job.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">cron-job.org</a>
-            {' '}→ <code className="text-[10px]">/api/cron/disparo</code> a cada 5–15 min.
+            Agende disparos automáticos com template, quantidade e horário definidos.
           </p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowSql(s => !s)}
-            className="text-xs px-3 py-2 rounded-lg cursor-pointer transition-all hover:opacity-80"
-            style={{ background: 'var(--surface2)', color: 'var(--text-2)', border: '1px solid var(--border)' }}
-          >
-            SQL
-          </button>
           <button
             onClick={() => setShowForm(s => !s)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-90 active:scale-[.98] cursor-pointer"
@@ -124,12 +115,9 @@ export default function Agendamentos({ templates }: { templates: Tmpl[] }) {
         </div>
       </div>
 
-      {/* SQL box */}
+      {/* SQL box — hidden, kept for reference only */}
       {showSql && (
         <div className="gcard p-5 mb-6 animate-fade-up">
-          <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-3)' }}>
-            Execute isso no Supabase → SQL Editor
-          </p>
           <pre
             className="text-xs rounded-xl p-4 overflow-x-auto"
             style={{ background: 'var(--surface2)', color: 'var(--text-2)' }}
