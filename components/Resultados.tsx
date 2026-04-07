@@ -13,7 +13,7 @@ interface ResultadosData {
   taxaAgendamento: string
 }
 
-type Preset = 'hoje' | '7d' | '30d' | 'custom'
+type Preset = 'hoje' | 'ontem' | '7d' | '40d' | 'custom'
 
 function todayBRL() {
   return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
@@ -57,9 +57,10 @@ export default function Resultados() {
   const [error, setError]           = useState('')
 
   const getRange = useCallback(() => {
-    if (preset === 'hoje') return { start: todayBRL(), end: todayBRL() }
-    if (preset === '7d')   return { start: daysAgoBRL(6), end: todayBRL() }
-    if (preset === '30d')  return { start: daysAgoBRL(29), end: todayBRL() }
+    if (preset === 'hoje')  return { start: todayBRL(), end: todayBRL() }
+    if (preset === 'ontem') return { start: daysAgoBRL(1), end: daysAgoBRL(1) }
+    if (preset === '7d')    return { start: daysAgoBRL(6), end: todayBRL() }
+    if (preset === '40d')   return { start: daysAgoBRL(39), end: todayBRL() }
     return { start: customStart, end: customEnd }
   }, [preset, customStart, customEnd])
 
@@ -83,9 +84,10 @@ export default function Resultados() {
   }, [fetchData, preset])
 
   const presets: { id: Preset; label: string }[] = [
-    { id: 'hoje', label: 'Hoje' },
-    { id: '7d',   label: '7 dias' },
-    { id: '30d',  label: '30 dias' },
+    { id: 'hoje',   label: 'Hoje' },
+    { id: 'ontem',  label: 'Ontem' },
+    { id: '7d',     label: '7 dias' },
+    { id: '40d',    label: '40 dias' },
     { id: 'custom', label: 'Personalizado' },
   ]
 
