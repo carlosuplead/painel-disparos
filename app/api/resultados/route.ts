@@ -51,11 +51,6 @@ export async function GET(request: NextRequest) {
     .gte('Timestamp', startDate)
     .lte('Timestamp', endDate + 'T23:59:59')
   const responderam: number = respCount ?? 0
-  const debugResp = {
-    respCount, respError: respError?.message ?? null,
-    dispData, dispError: dispError?.message ?? null,
-    startUTC, endUTC
-  }
 
   // ── 3. FINALIZADOS PELA IA: pausado = 'true', filtrado por Timestamp (texto ISO) no período BRL ──
   const { count: pausados } = await supabase
@@ -86,7 +81,6 @@ export async function GET(request: NextRequest) {
     periodo: { start: startDate, end: endDate },
     disparados,
     responderam,
-    _debug: debugResp,
     pausados:       pausados ?? 0,
     agendados:      agendados ?? 0,
     totalAgendados: totalAgendados ?? 0,
