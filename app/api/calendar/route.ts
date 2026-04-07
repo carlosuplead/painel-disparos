@@ -113,12 +113,17 @@ export async function GET(request: NextRequest) {
         const rawUrl = urlMatch?.[0]?.trim() ?? null
         const videoLink = conferenceLink ?? (rawUrl ? (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`) : null)
 
+        // Limpa HTML da descrição para exibição
+        const cleanDesc = e.description
+          ? stripHtml(e.description).replace(/\s{2,}/g, '\n').trim()
+          : null
+
         return {
           id:             `${cal.id}::${e.id}`,
           title:          e.summary ?? '(sem título)',
           start:          e.start?.dateTime ?? e.start?.date,
           end:            e.end?.dateTime ?? e.end?.date,
-          description:    e.description ?? null,
+          description:    cleanDesc,
           attendees:      (e.attendees ?? []).map((a: any) => ({ email: a.email, name: a.displayName ?? null, self: a.self ?? false })),
           location:       e.location ?? null,
           link:           videoLink,

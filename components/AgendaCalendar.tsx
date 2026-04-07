@@ -53,17 +53,21 @@ function ownerOf(event: CalendarEvent): string | null {
   const byCalId = OWNERS.find(o => calId === o.email.toLowerCase() || calId.includes(o.email.toLowerCase()))
   if (byCalId) return byCalId.email
 
-  // 2. organizador do evento é um dos donos
+  // 2. Vendas01 → sempre 01.nexo, independente de attendees
+  const nexoEmail = '01.nexoaceleradora@gmail.com'
+  if (calName.includes('vendas')) return nexoEmail
+
+  // 3. organizador do evento é um dos donos
   const byOrganizer = OWNERS.find(o => organizer === o.email.toLowerCase())
   if (byOrganizer) return byOrganizer.email
 
-  // 3. attendee é um dos donos (Felipe/Daniel têm prioridade sobre nome do calendário)
+  // 4. attendee é um dos donos (Felipe/Daniel)
   const byAttendee = OWNERS.find(o =>
     event.attendees.some(a => a.email.toLowerCase() === o.email.toLowerCase())
   )
   if (byAttendee) return byAttendee.email
 
-  // 4. nome do calendário como último recurso (ex: evento sem attendees no Vendas01)
+  // 5. nome do calendário como último recurso
   const byCalName = OWNERS.find(o => o.terms.some(t => calName.includes(t)))
   return byCalName?.email ?? null
 }
