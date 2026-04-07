@@ -101,7 +101,9 @@ export default function Agendamentos({ templates }: { templates: Tmpl[] }) {
         <div>
           <h2 className="font-semibold" style={{ color: 'var(--text)' }}>Disparos Agendados</h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
-            Verificação automática a cada 15 minutos.
+            Configure um cron em{' '}
+            <a href="https://cron-job.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">cron-job.org</a>
+            {' '}→ <code className="text-[10px]">/api/cron/disparo</code> a cada 5–15 min.
           </p>
         </div>
         <div className="flex gap-2">
