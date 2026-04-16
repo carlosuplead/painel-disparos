@@ -27,6 +27,7 @@ const OWNERS = [
   { email: 'felipemarketingperformance@gmail.com', label: 'Felipe'  },
   { email: '01.nexoaceleradora@gmail.com',         label: '01.nexo' },
   { email: 'danielvolpi83@gmail.com',              label: 'Daniel'  },
+  { email: 'agenda-extra',                         label: 'Agenda Extra' },
 ]
 
 function fmtTime(iso: string) {
@@ -45,9 +46,10 @@ function fmtDateLabel(iso: string) {
 }
 
 const CAL_MAP: Record<string, string> = {
-  'nexo digital 2': 'felipemarketingperformance@gmail.com',
-  'nexo digital':   'danielvolpi83@gmail.com',
-  'vendas01':       '01.nexoaceleradora@gmail.com',
+  'nexo digital 2':          'felipemarketingperformance@gmail.com',
+  'nexo digital':            'danielvolpi83@gmail.com',
+  'vendas01':                '01.nexoaceleradora@gmail.com',
+  'agenda extra - geral':    'agenda-extra',
 }
 
 function ownerOf(event: CalendarEvent): string | null {
